@@ -5,16 +5,17 @@ interface KpiCardProps {
   label: string;
   value: number | string;
   icon: ReactNode;
-  accent?: "blue" | "green" | "amber" | "red" | "violet";
+  accent?: "blue" | "green" | "amber" | "red" | "violet" | "teal";
   sub?: string;
 }
 
 const ACCENT = {
-  blue:   "text-blue-400 bg-blue-900/20 border-blue-900",
-  green:  "text-emerald-400 bg-emerald-900/20 border-emerald-900",
-  amber:  "text-amber-400 bg-amber-900/20 border-amber-900",
-  red:    "text-red-400 bg-red-900/20 border-red-900",
-  violet: "text-violet-400 bg-violet-900/20 border-violet-900",
+  blue:   "text-teal-700 dark:text-teal-300 bg-teal-600/10 border-teal-600/20",
+  teal:   "text-teal-700 dark:text-teal-300 bg-teal-600/10 border-teal-600/20",
+  green:  "text-emerald-700 dark:text-emerald-300 bg-emerald-600/10 border-emerald-600/20",
+  amber:  "text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-600/20",
+  red:    "text-rose-700 dark:text-rose-300 bg-rose-600/10 border-rose-600/20",
+  violet: "text-indigo-700 dark:text-indigo-300 bg-indigo-600/10 border-indigo-600/20",
 };
 
 export function KpiCard({ label, value, icon, accent = "blue", sub }: KpiCardProps) {

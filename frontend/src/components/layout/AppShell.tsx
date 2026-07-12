@@ -1,5 +1,5 @@
 "use client";
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Sidebar } from "./Sidebar";
@@ -7,12 +7,14 @@ import { Sidebar } from "./Sidebar";
 export function AppShell({ children }: { children: ReactNode }) {
   const { token } = useAuth();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     if (!token) router.replace("/login");
   }, [token, router]);
 
-  if (!token) return null;
+  if (!mounted || !token) return null;
 
   return (
     <div className="flex h-screen overflow-hidden animate-fade-in bg-transparent">

@@ -3,8 +3,10 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, Select } from "@/components/ui/FilterBar";
 import { Modal, FormField, Input, SelectField, Btn } from "@/components/ui/Modal";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Spinner } from "@/components/ui/Spinner";
 import { apiFetch } from "@/lib/api";
-import { Plus } from "lucide-react";
+import { Plus, PackageSearch } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const STATUS_OPTS = [
@@ -24,6 +26,7 @@ export default function AssetsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [modal, setModal] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -36,6 +39,7 @@ export default function AssetsPage() {
   }, []);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
       const [ass, meta] = await Promise.all([
         apiFetch("/assets"),
@@ -45,6 +49,8 @@ export default function AssetsPage() {
       setMetadata(meta);
     } catch (e) {
       console.error(e);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -87,39 +93,51 @@ export default function AssetsPage() {
       </FilterBar>
 
       <div className="rounded-xl glass border overflow-hidden">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="border-b" style={{ borderColor: "var(--border-subtle)", background: "rgba(255,255,255,0.02)" }}>
-              {["Asset Tag", "Name", "Category", "Status", "Location"].map((h) => (
-                <th key={h} className="text-left px-5 py-4 font-medium" style={{ color: "var(--text-secondary)" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan={5} className="px-5 py-12 text-center" style={{ color: "var(--text-muted)" }}>No assets found matching your criteria.</td></tr>
-            ) : filtered.map((a) => (
-              <tr key={a.id} className="border-b transition-colors hover:bg-white/5 cursor-pointer"
-                style={{ borderColor: "var(--border-subtle)" }}
-              >
-                <td className="px-5 py-4 font-mono text-blue-400 font-medium">{a.assetTag}</td>
-                <td className="px-5 py-4 font-medium" style={{ color: "var(--text-primary)" }}>{a.name}</td>
-                <td className="px-5 py-4" style={{ color: "var(--text-secondary)" }}>{a.category?.name || "—"}</td>
-                <td className="px-5 py-4">
-                  <span className={`px-3 py-1 rounded-full border text-[11px] font-medium tracking-wide capitalize ${
-                    a.status === 'AVAILABLE' ? 'border-green-500/30 text-green-400 bg-green-500/10' :
-                    a.status === 'ALLOCATED' ? 'border-blue-500/30 text-blue-400 bg-blue-500/10' :
-                    a.status === 'UNDER_MAINTENANCE' ? 'border-amber-500/30 text-amber-400 bg-amber-500/10' :
-                    'border-gray-500/30 text-gray-400 bg-gray-500/10'
-                  }`}>
-                    {a.status.toLowerCase().replace('_', ' ')}
-                  </span>
-                </td>
-                <td className="px-5 py-4" style={{ color: "var(--text-secondary)" }}>{a.location?.name || "—"}</td>
+        {loading ? (
+          <Spinner />
+        ) : (
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b" style={{ borderColor: "var(--border-subtle)", background: "rgba(255,255,255,0.02)" }}>
+                {["Asset Tag", "Name", "Category", "Status", "Location"].map((h) => (
+                  <th key={h} className="text-left px-5 py-4 font-medium" style={{ color: "var(--text-secondary)" }}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-8">
+                    <EmptyState
+                      icon={PackageSearch}
+                      title="No Assets Found"
+                      description="We couldn't find any assets matching your search criteria. Try adjusting your filters or register a new asset."
+                    />
+                  </td>
+                </tr>
+              ) : filtered.map((a) => (
+                <tr key={a.id} className="border-b transition-colors hover:bg-slate-500/5 cursor-pointer"
+                  style={{ borderColor: "var(--border-subtle)" }}
+                >
+                  <td className="px-5 py-4 font-mono text-blue-400 font-medium">{a.assetTag}</td>
+                  <td className="px-5 py-4 font-medium" style={{ color: "var(--text-primary)" }}>{a.name}</td>
+                  <td className="px-5 py-4" style={{ color: "var(--text-secondary)" }}>{a.category?.name || "—"}</td>
+                  <td className="px-5 py-4">
+                    <span className={`px-3 py-1 rounded-full border text-[11px] font-medium tracking-wide capitalize ${
+                      a.status === 'AVAILABLE' ? 'border-green-500/30 text-green-400 bg-green-500/10' :
+                      a.status === 'ALLOCATED' ? 'border-blue-500/30 text-blue-400 bg-blue-500/10' :
+                      a.status === 'UNDER_MAINTENANCE' ? 'border-amber-500/30 text-amber-400 bg-amber-500/10' :
+                      'border-gray-500/30 text-gray-400 bg-gray-500/10'
+                    }`}>
+                      {a.status.toLowerCase().replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4" style={{ color: "var(--text-secondary)" }}>{a.location?.name || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title="Register New Asset" width="max-w-2xl">

@@ -1,35 +1,51 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Modal, FormField, Input, Btn, SelectField } from "@/components/ui/Modal";
+import { Spinner } from "@/components/ui/Spinner";
 import { apiFetch } from "@/lib/api";
+import { primaryRole, roleNames } from "@/lib/roles";
+
+type Department = { id: string; name: string; code: string };
+type Category = { id: string; name: string; description?: string | null };
+type Location = { id: string; name: string };
+type Employee = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  roles?: unknown[];
+  userRoles?: unknown[];
+};
+type OrganizationForm = {
+  name?: string;
+  code?: string;
+  locationId?: string;
+  description?: string;
+};
 
 export default function OrganizationPage() {
   const { user } = useAuth();
-  const router = useRouter();
   const [tab, setTab] = useState<"departments" | "categories" | "employees">("departments");
   
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [locations, setLocations] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
 
   const [modal, setModal] = useState<"dept"|"cat"|null>(null);
-  const [form, setForm] = useState<any>({});
+  const [form, setForm] = useState<OrganizationForm>({});
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const fetchData = async () => {
+    setInitialLoading(true);
     try {
       const [meta, users] = await Promise.all([
         apiFetch("/metadata"),
-        apiFetch("/org/users")
+        apiFetch("/organizations/users")
       ]);
       setDepartments(meta.departments);
       setCategories(meta.categories);
@@ -37,17 +53,24 @@ export default function OrganizationPage() {
       setEmployees(users);
     } catch (e) {
       console.error(e);
+    } finally {
+      setInitialLoading(false);
     }
   };
 
-  const setF = (k: string) => (e: any) => setForm((f: any) => ({ ...f, [k]: e.target.value }));
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchData();
+  }, []);
+
+  const setF = (k: keyof OrganizationForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      if (modal === "dept") await apiFetch("/org/departments", { method: "POST", body: JSON.stringify(form) });
-      if (modal === "cat") await apiFetch("/org/categories", { method: "POST", body: JSON.stringify(form) });
+      if (modal === "dept") await apiFetch("/organizations/departments", { method: "POST", body: JSON.stringify(form) });
+      if (modal === "cat") await apiFetch("/organizations/categories", { method: "POST", body: JSON.stringify(form) });
       setModal(null);
       fetchData();
     } catch (e) {
@@ -58,12 +81,12 @@ export default function OrganizationPage() {
   };
 
   // Basic RBAC guard
-  if (user && !user.roles.includes("ADMIN")) {
-    return <div className="p-8 text-center text-red-400 glass-card rounded-xl">You do not have permission to view this page.</div>;
+  if (user && !roleNames(user.roles).includes("ADMIN")) {
+    return <div className="p-8 text-center glass-card rounded-xl" style={{ color: "var(--danger)" }}>You do not have permission to view this page.</div>;
   }
 
   const TAB_CLS = (t: string) =>
-    `px-4 py-2 text-[13px] font-medium border-b-2 transition-colors ${tab === t ? "border-blue-500 text-blue-400" : "border-transparent text-slate-500 hover:text-slate-300"}`;
+    `px-4 py-2 rounded-xl text-[13px] font-bold border transition-all ${tab === t ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-glow)]" : "border-transparent text-[var(--text-secondary)] hover:bg-slate-500/10"}`;
 
   return (
     <div className="animate-fade-in">
@@ -77,59 +100,63 @@ export default function OrganizationPage() {
         }
       />
       
-      <div className="flex gap-4 mb-6 border-b" style={{ borderColor: "var(--border-subtle)" }}>
+      <div className="flex gap-2 mb-6">
         <button className={TAB_CLS("departments")} onClick={() => setTab("departments")}>Departments</button>
         <button className={TAB_CLS("categories")} onClick={() => setTab("categories")}>Categories</button>
         <button className={TAB_CLS("employees")} onClick={() => setTab("employees")}>Employees</button>
       </div>
 
       <div className="rounded-xl glass border overflow-hidden">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="border-b" style={{ borderColor: "var(--border-subtle)", background: "rgba(255,255,255,0.02)" }}>
-              {tab === "departments" && <>
-                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Department Name</th>
-                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Code</th>
-                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Status</th>
-              </>}
-              {tab === "categories" && <>
-                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Category Name</th>
-                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Description</th>
-              </>}
-              {tab === "employees" && <>
-                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Name</th>
-                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Email</th>
-                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Roles</th>
-              </>}
-            </tr>
-          </thead>
-          <tbody>
-            {tab === "departments" && departments.map((d, i) => (
-              <tr key={d.id} className="border-b transition-colors hover:bg-white/5" style={{ borderColor: "var(--border-subtle)" }}>
-                <td className="px-5 py-3.5" style={{ color: "var(--text-primary)" }}>{d.name}</td>
-                <td className="px-5 py-3.5" style={{ color: "var(--text-secondary)" }}>{d.code}</td>
-                <td className="px-5 py-3.5">
-                  <span className="px-3 py-1 rounded-full border border-green-500/30 text-green-400 text-[11px] font-medium tracking-wide bg-green-500/10">Active</span>
-                </td>
+        {initialLoading ? (
+          <Spinner />
+        ) : (
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-hover)" }}>
+                {tab === "departments" && <>
+                  <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Department Name</th>
+                  <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Code</th>
+                  <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Status</th>
+                </>}
+                {tab === "categories" && <>
+                  <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Category Name</th>
+                  <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Description</th>
+                </>}
+                {tab === "employees" && <>
+                  <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Name</th>
+                  <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Email</th>
+                  <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Roles</th>
+                </>}
               </tr>
-            ))}
-            {tab === "categories" && categories.map((c, i) => (
-              <tr key={c.id} className="border-b transition-colors hover:bg-white/5" style={{ borderColor: "var(--border-subtle)" }}>
-                <td className="px-5 py-3.5 font-medium text-blue-400">{c.name}</td>
-                <td className="px-5 py-3.5" style={{ color: "var(--text-secondary)" }}>{c.description || "—"}</td>
-              </tr>
-            ))}
-            {tab === "employees" && employees.map((e, i) => (
-              <tr key={e.id} className="border-b transition-colors hover:bg-white/5" style={{ borderColor: "var(--border-subtle)" }}>
-                <td className="px-5 py-3.5 font-medium" style={{ color: "var(--text-primary)" }}>{e.firstName} {e.lastName}</td>
-                <td className="px-5 py-3.5" style={{ color: "var(--text-secondary)" }}>{e.email}</td>
-                <td className="px-5 py-3.5">
-                  <span className="px-3 py-1 rounded-full border border-blue-500/30 text-blue-400 text-[11px] font-medium tracking-wide bg-blue-500/10">{e.roles[0]}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {tab === "departments" && departments.map((d) => (
+                <tr key={d.id} className="border-b transition-colors hover:bg-slate-500/10" style={{ borderColor: "var(--border-subtle)" }}>
+                  <td className="px-5 py-3.5" style={{ color: "var(--text-primary)" }}>{d.name}</td>
+                  <td className="px-5 py-3.5" style={{ color: "var(--text-secondary)" }}>{d.code}</td>
+                  <td className="px-5 py-3.5">
+                    <span className="px-3 py-1 rounded-full border border-green-500/30 text-green-400 text-[11px] font-medium tracking-wide bg-green-500/10">Active</span>
+                  </td>
+                </tr>
+              ))}
+              {tab === "categories" && categories.map((c) => (
+                <tr key={c.id} className="border-b transition-colors hover:bg-slate-500/10" style={{ borderColor: "var(--border-subtle)" }}>
+                  <td className="px-5 py-3.5 font-medium" style={{ color: "var(--accent)" }}>{c.name}</td>
+                  <td className="px-5 py-3.5" style={{ color: "var(--text-secondary)" }}>{c.description || "—"}</td>
+                </tr>
+              ))}
+              {tab === "employees" && employees.map((e) => (
+                <tr key={e.id} className="border-b transition-colors hover:bg-slate-500/10" style={{ borderColor: "var(--border-subtle)" }}>
+                  <td className="px-5 py-3.5 font-medium" style={{ color: "var(--text-primary)" }}>{e.firstName} {e.lastName}</td>
+                  <td className="px-5 py-3.5" style={{ color: "var(--text-secondary)" }}>{e.email}</td>
+                  <td className="px-5 py-3.5">
+                    <span className="px-3 py-1 rounded-full border text-[11px] font-medium tracking-wide" style={{ borderColor: "var(--accent-glow)", color: "var(--accent)", background: "var(--accent-glow)" }}>{primaryRole(e.roles ?? e.userRoles)}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <Modal open={!!modal} onClose={() => setModal(null)} title={`Add ${modal === "dept" ? "Department" : "Category"}`}>

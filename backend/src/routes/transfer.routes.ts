@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { TransferService } from '../modules/assets/services/transfer.service';
-import { requireTransferApprovalAccess } from '../middleware/auth';
+import { requireAuth, requireTransferApprovalAccess } from '../middleware/auth';
+import { prisma } from '../lib/db/prisma';
 
 const router = Router();
 
@@ -34,7 +35,20 @@ router.post('/:transferId/reject', requireTransferApprovalAccess, async (req, re
   }
 });
 
-router.post('/', async (req, res, next) => {
+router.get('/', requireAuth, async (req, res, next) => {
+  try {
+    const transfers = await prisma.transferRequest.findMany({
+      where: { organizationId: req.user!.organizationId },
+      include: { asset: true, requestedBy: true, targetUser: true, targetDepartment: true, targetLocation: true },
+      orderBy: { requestedAt: 'desc' }
+    });
+    res.json(transfers);
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+router.post('/', requireAuth, async (req, res, next) => {
   try {
     const data = req.body;
     const transfer = await TransferService.requestTransfer(

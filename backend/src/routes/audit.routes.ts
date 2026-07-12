@@ -25,7 +25,7 @@ router.get('/', requireAuth, async (req, res, next) => {
     // Compute summaries on the fly
     const mapped = cycles.map(c => {
       const verified = c.records.length;
-      const discrepancies = c.records.filter(r => r.outcome === 'DISCREPANCY').length;
+      const discrepancies = c.records.filter(r => r.status === 'MISSING' || r.status === 'DAMAGED' || r.status === 'MOVED').length;
       return {
         ...c,
         total: 100, // Normally this would be total assets in scope
@@ -60,7 +60,7 @@ router.post('/verify/:recordId', requireRole('ADMIN', 'MANAGER', 'AUDITOR'), asy
     const { recordId } = req.params;
     const record = await AuditService.verifyAsset(
       req.user!.organizationId,
-      recordId,
+      recordId as string,
       req.user!.userId,
       req.body
     );

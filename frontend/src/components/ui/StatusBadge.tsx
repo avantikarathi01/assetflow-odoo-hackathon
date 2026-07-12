@@ -2,46 +2,46 @@ import clsx from "clsx";
 
 const VARIANTS: Record<string, string> = {
   // Asset status
-  AVAILABLE:       "bg-emerald-900/40 text-emerald-400 border-emerald-800",
-  ALLOCATED:       "bg-blue-900/40 text-blue-400 border-blue-800",
-  UNDER_MAINTENANCE:"bg-amber-900/40 text-amber-400 border-amber-800",
-  RESERVED:        "bg-violet-900/40 text-violet-400 border-violet-800",
-  LOST:            "bg-red-900/40 text-red-400 border-red-800",
-  RETIRED:         "bg-zinc-800 text-zinc-400 border-zinc-700",
-  DISPOSED:        "bg-zinc-800 text-zinc-500 border-zinc-700",
+  AVAILABLE:       "bg-emerald-600/10 text-emerald-700 dark:text-emerald-300 border-emerald-600/20",
+  ALLOCATED:       "bg-teal-600/10 text-teal-700 dark:text-teal-300 border-teal-600/20",
+  UNDER_MAINTENANCE:"bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-600/20",
+  RESERVED:        "bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border-indigo-600/20",
+  LOST:            "bg-rose-600/10 text-rose-700 dark:text-rose-300 border-rose-600/20",
+  RETIRED:         "bg-slate-600/10 text-slate-600 dark:text-slate-300 border-slate-600/20",
+  DISPOSED:        "bg-slate-600/10 text-slate-500 dark:text-slate-400 border-slate-600/20",
   // Allocation / Transfer
-  ACTIVE:          "bg-blue-900/40 text-blue-400 border-blue-800",
-  RETURNED:        "bg-emerald-900/40 text-emerald-400 border-emerald-800",
-  REQUESTED:       "bg-amber-900/40 text-amber-400 border-amber-800",
-  APPROVED:        "bg-emerald-900/40 text-emerald-400 border-emerald-800",
-  REJECTED:        "bg-red-900/40 text-red-400 border-red-800",
-  COMPLETED:       "bg-emerald-900/40 text-emerald-400 border-emerald-800",
-  CANCELLED:       "bg-zinc-800 text-zinc-400 border-zinc-700",
+  ACTIVE:          "bg-teal-600/10 text-teal-700 dark:text-teal-300 border-teal-600/20",
+  RETURNED:        "bg-emerald-600/10 text-emerald-700 dark:text-emerald-300 border-emerald-600/20",
+  REQUESTED:       "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-600/20",
+  APPROVED:        "bg-emerald-600/10 text-emerald-700 dark:text-emerald-300 border-emerald-600/20",
+  REJECTED:        "bg-rose-600/10 text-rose-700 dark:text-rose-300 border-rose-600/20",
+  COMPLETED:       "bg-emerald-600/10 text-emerald-700 dark:text-emerald-300 border-emerald-600/20",
+  CANCELLED:       "bg-slate-600/10 text-slate-600 dark:text-slate-300 border-slate-600/20",
   // Booking
-  HELD:            "bg-amber-900/40 text-amber-400 border-amber-800",
-  CONFIRMED:       "bg-blue-900/40 text-blue-400 border-blue-800",
-  CHECKED_IN:      "bg-violet-900/40 text-violet-400 border-violet-800",
-  EXPIRED:         "bg-zinc-800 text-zinc-400 border-zinc-700",
+  HELD:            "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-600/20",
+  CONFIRMED:       "bg-teal-600/10 text-teal-700 dark:text-teal-300 border-teal-600/20",
+  CHECKED_IN:      "bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border-indigo-600/20",
+  EXPIRED:         "bg-slate-600/10 text-slate-600 dark:text-slate-300 border-slate-600/20",
   // Maintenance
-  PENDING:         "bg-amber-900/40 text-amber-400 border-amber-800",
-  ASSIGNED:        "bg-blue-900/40 text-blue-400 border-blue-800",
-  IN_REPAIR:       "bg-violet-900/40 text-violet-400 border-violet-800",
-  RESOLVED:        "bg-emerald-900/40 text-emerald-400 border-emerald-800",
+  PENDING:         "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-600/20",
+  ASSIGNED:        "bg-teal-600/10 text-teal-700 dark:text-teal-300 border-teal-600/20",
+  IN_REPAIR:       "bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border-indigo-600/20",
+  RESOLVED:        "bg-emerald-600/10 text-emerald-700 dark:text-emerald-300 border-emerald-600/20",
   // Audit
-  OPEN:            "bg-blue-900/40 text-blue-400 border-blue-800",
-  IN_PROGRESS:     "bg-violet-900/40 text-violet-400 border-violet-800",
-  CLOSED:          "bg-zinc-800 text-zinc-400 border-zinc-700",
-  DISCREPANCY:     "bg-red-900/40 text-red-400 border-red-800",
-  MATCHED:         "bg-emerald-900/40 text-emerald-400 border-emerald-800",
+  OPEN:            "bg-teal-600/10 text-teal-700 dark:text-teal-300 border-teal-600/20",
+  IN_PROGRESS:     "bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border-indigo-600/20",
+  CLOSED:          "bg-slate-600/10 text-slate-600 dark:text-slate-300 border-slate-600/20",
+  DISCREPANCY:     "bg-rose-600/10 text-rose-700 dark:text-rose-300 border-rose-600/20",
+  MATCHED:         "bg-emerald-600/10 text-emerald-700 dark:text-emerald-300 border-emerald-600/20",
   // Priority
-  LOW:             "bg-zinc-800 text-zinc-400 border-zinc-700",
-  MEDIUM:          "bg-amber-900/40 text-amber-400 border-amber-800",
-  HIGH:            "bg-orange-900/40 text-orange-400 border-orange-800",
-  CRITICAL:        "bg-red-900/40 text-red-400 border-red-800",
+  LOW:             "bg-slate-600/10 text-slate-600 dark:text-slate-300 border-slate-600/20",
+  MEDIUM:          "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-600/20",
+  HIGH:            "bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-600/20",
+  CRITICAL:        "bg-rose-600/10 text-rose-700 dark:text-rose-300 border-rose-600/20",
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const cls = VARIANTS[status] ?? "bg-zinc-800 text-zinc-400 border-zinc-700";
+  const cls = VARIANTS[status] ?? "bg-slate-600/10 text-slate-600 dark:text-slate-300 border-slate-600/20";
   return (
     <span className={clsx("inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border", cls)}>
       {status.replace(/_/g, " ")}

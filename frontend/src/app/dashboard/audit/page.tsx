@@ -4,12 +4,15 @@ import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Modal, FormField, Input, Btn, Textarea } from "@/components/ui/Modal";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Spinner } from "@/components/ui/Spinner";
 import { Plus, ScanLine, Activity, Target } from "lucide-react";
 
 export default function AuditPage() {
   const { user } = useAuth();
   const [cycles, setCycles] = useState<any[]>([]);
   const [tab, setTab] = useState<"current" | "past">("current");
+  const [initialLoading, setInitialLoading] = useState(true);
   
   const [modal, setModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -21,18 +24,21 @@ export default function AuditPage() {
   }, []);
 
   const fetchData = async () => {
+    setInitialLoading(true);
     try {
-      const data = await apiFetch("/audit");
+      const data = await apiFetch("/audits");
       setCycles(data);
     } catch (e) {
       console.error(e);
+    } finally {
+      setInitialLoading(false);
     }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault(); setError(""); setSaving(true);
     try {
-      await apiFetch("/audit", { method: "POST", body: JSON.stringify(form) });
+      await apiFetch("/audits", { method: "POST", body: JSON.stringify(form) });
       setModal(false);
       fetchData();
     } catch (err: any) {
@@ -61,30 +67,30 @@ export default function AuditPage() {
         }
       />
 
-      <div className="flex gap-4 mb-6 border-b border-[rgba(255,255,255,0.05)]">
-        <button 
-          className={`px-4 py-2 text-[13px] tracking-wide transition-all ${tab === "current" ? "border-b-2 border-blue-500 font-medium text-blue-400" : "border-b-2 border-transparent text-slate-500 hover:text-slate-300"}`}
+      <div className="flex gap-2 mb-6">
+        <button
+          className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all border ${tab === "current" ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-glow)]" : "border-transparent text-[var(--text-secondary)] hover:bg-slate-500/10"}`}
           onClick={() => setTab("current")}
         >
           Active Cycles ({currentCycles.length})
         </button>
-        <button 
-          className={`px-4 py-2 text-[13px] tracking-wide transition-all ${tab === "past" ? "border-b-2 border-blue-500 font-medium text-blue-400" : "border-b-2 border-transparent text-slate-500 hover:text-slate-300"}`}
+        <button
+          className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all border ${tab === "past" ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-glow)]" : "border-transparent text-[var(--text-secondary)] hover:bg-slate-500/10"}`}
           onClick={() => setTab("past")}
         >
-          Completed Audits ({pastCycles.length})
+          Completed ({pastCycles.length})
         </button>
       </div>
 
       <div className="space-y-6">
-        {displayCycles.length === 0 ? (
-          <div className="glass rounded-xl p-12 flex flex-col items-center justify-center text-center border-[rgba(255,255,255,0.02)]">
-            <Target size={36} className="text-slate-600 mb-4" />
-            <h3 className="text-[15px] font-medium text-slate-300 mb-2">No {tab} audit cycles</h3>
-            <p className="text-[13px] text-slate-500 max-w-sm">
-              {tab === "current" ? "Create a new audit cycle to start tracking inventory accuracy." : "You haven't completed any audit cycles yet."}
-            </p>
-          </div>
+        {initialLoading ? (
+          <Spinner />
+        ) : displayCycles.length === 0 ? (
+          <EmptyState
+            icon={Target}
+            title={tab === "current" ? "No Active Audits" : "No Completed Audits"}
+            description={tab === "current" ? "Create a new audit cycle to start tracking inventory accuracy across your organization." : "Once audit cycles are completed and closed, they will appear here."}
+          />
         ) : (
           displayCycles.map(cycle => (
             <div key={cycle.id} className="glass-card rounded-xl p-6 relative overflow-hidden group border border-[rgba(255,255,255,0.05)]">

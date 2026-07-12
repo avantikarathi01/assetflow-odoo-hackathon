@@ -9,7 +9,7 @@ export class AllocationService {
    * Allocates an asset to a user.
    * Enforces atomic constraints: An asset cannot be allocated if it's already active.
    */
-  static async allocateAsset(organizationId: string, assetId: string, allocatedById: string, data: { allocatedToUserId: string, expectedReturnAt?: Date }) {
+  static async allocateAsset(organizationId: string, assetId: string, allocatedById: string, data: { allocatedToUserId: string, expectedReturnAt?: Date, issueNotes?: string }) {
     const asset = await prisma.asset.findFirst({
       where: { id: assetId, organizationId, deletedAt: null }
     });
@@ -30,6 +30,7 @@ export class AllocationService {
           allocatedToUserId: data.allocatedToUserId,
           allocatedById,
           expectedReturnAt: data.expectedReturnAt,
+          issueNotes: data.issueNotes,
           status: AllocationStatus.ACTIVE,
         }
       });

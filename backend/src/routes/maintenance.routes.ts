@@ -55,7 +55,7 @@ router.patch('/:id/status', requireManager, async (req, res, next) => {
   try {
     const { status, resolutionNotes } = req.body;
     const record = await prisma.maintenanceRequest.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: { status, resolutionNotes }
     });
     
@@ -132,7 +132,7 @@ router.post('/:requestId/resolve', requireRole('ADMIN', 'MANAGER', 'TECHNICIAN')
   try {
     const { requestId } = req.params;
     const maintenanceRequest = await prisma.maintenanceRequest.findFirst({
-      where: { id: requestId, organizationId: req.user!.organizationId }
+      where: { id: requestId as string, organizationId: req.user!.organizationId }
     });
 
     if (!maintenanceRequest) {

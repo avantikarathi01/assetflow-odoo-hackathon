@@ -18,7 +18,8 @@ async function main() {
     password: "Password123!",
     firstName: "Alice",
     lastName: "Admin",
-    organizationName: `Acme Corp ${ts}`
+    organizationName: `Acme Corp ${ts}`,
+    slug: `acme-${ts}`
   });
   console.log(`✅ Organization created: ${adminRes.organization.name}`);
   console.log(`✅ Admin created: ${adminRes.user.email}`);

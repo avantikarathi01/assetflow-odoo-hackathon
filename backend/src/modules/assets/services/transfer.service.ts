@@ -36,18 +36,33 @@ export class TransferService {
       throw new ConflictError('A transfer request is already pending for this asset.');
     }
 
-    return prisma.transferRequest.create({
-      data: {
-        organizationId,
-        assetId: data.assetId,
-        requestedById,
-        allocationId: asset.activeAllocation?.allocationId,
-        targetUserId: data.targetUserId,
-        targetDepartmentId: data.targetDepartmentId,
-        targetLocationId: data.targetLocationId,
-        reason: data.reason,
-        status: TransferStatus.REQUESTED
-      }
+    return prisma.$transaction(async (tx) => {
+      const transfer = await tx.transferRequest.create({
+        data: {
+          organizationId,
+          assetId: data.assetId,
+          requestedById,
+          allocationId: asset.activeAllocation?.allocationId,
+          targetUserId: data.targetUserId,
+          targetDepartmentId: data.targetDepartmentId,
+          targetLocationId: data.targetLocationId,
+          reason: data.reason,
+          status: TransferStatus.REQUESTED
+        }
+      });
+
+      await tx.activityLog.create({
+        data: {
+          organizationId,
+          actorId: requestedById,
+          action: 'REQUESTED',
+          entityType: 'TransferRequest',
+          entityId: transfer.id,
+          reason: data.reason
+        }
+      });
+
+      return transfer;
     });
   }
 

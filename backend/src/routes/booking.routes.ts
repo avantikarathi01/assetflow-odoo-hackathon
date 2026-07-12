@@ -60,7 +60,7 @@ router.post('/:bookingId/confirm', requireAuth, async (req, res, next) => {
     const { bookingId } = req.params;
     const booking = await BookingService.confirmBooking(
       req.user!.organizationId,
-      bookingId,
+      bookingId as string,
       req.user!.userId
     );
     res.json(booking);
@@ -76,7 +76,7 @@ router.post('/:bookingId/cancel', requireAuth, async (req, res, next) => {
     const { reason } = req.body;
     const booking = await BookingService.cancelBooking(
       req.user!.organizationId,
-      bookingId,
+      bookingId as string,
       req.user!.userId,
       reason
     );
@@ -92,7 +92,7 @@ router.post('/:bookingId/checkin', requireAuth, async (req, res, next) => {
     const { bookingId } = req.params;
     const booking = await BookingService.checkIn(
       req.user!.organizationId,
-      bookingId
+      bookingId as string
     );
     res.json(booking);
   } catch (error) {
@@ -106,7 +106,7 @@ router.post('/:bookingId/complete', requireAuth, async (req, res, next) => {
     const { bookingId } = req.params;
     const booking = await BookingService.completeBooking(
       req.user!.organizationId,
-      bookingId,
+      bookingId as string,
       req.user!.userId
     );
     res.json(booking);
@@ -120,7 +120,7 @@ router.patch('/:id/status', requireAuth, async (req, res, next) => {
   try {
     const { status } = req.body;
     const booking = await prisma.resourceBooking.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: { status }
     });
     res.json(booking);

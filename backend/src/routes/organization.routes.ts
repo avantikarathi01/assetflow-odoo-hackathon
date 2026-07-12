@@ -10,7 +10,7 @@ router.get('/users', requireAuth, async (req, res, next) => {
   try {
     const users = await prisma.user.findMany({
       where: { organizationId: req.user!.organizationId },
-      include: { department: true }
+      include: { department: true, userRoles: { include: { role: true } } }
     });
     res.json(users);
   } catch (error) {
@@ -53,6 +53,7 @@ router.post('/categories', requireAdmin, async (req, res, next) => {
       data: {
         organizationId: req.user!.organizationId,
         name: req.body.name,
+        code: req.body.code || req.body.name.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6),
         description: req.body.description
       }
     });

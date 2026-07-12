@@ -25,6 +25,7 @@ async function runE2E() {
     const orgSuffix = Date.now();
     const { user: admin, organization: org } = await AuthService.registerOrganization({
       organizationName: `Acme Corp ${orgSuffix}`,
+      slug: `acme-${orgSuffix}`,
       firstName: 'Alice',
       lastName: 'Admin',
       email: `alice+${orgSuffix}@example.com`,

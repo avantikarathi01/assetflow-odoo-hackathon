@@ -5,26 +5,54 @@ import clsx from "clsx";
 import {
   LayoutDashboard, Building2, Package, ArrowLeftRight,
   CalendarDays, Wrench, ClipboardCheck, BarChart2, Bell, LogOut,
+  Moon, Sun, Shield, Building, UserCircle2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { primaryRole, roleNames } from "@/lib/roles";
+import { useTheme } from "@/lib/theme-context";
 import { useRouter } from "next/navigation";
 
 const NAV = [
-  { href: "/dashboard",              label: "Dashboard",         icon: LayoutDashboard, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
-  { href: "/dashboard/organization", label: "Organization setup",icon: Building2,       roles: ['ADMIN'] },
-  { href: "/dashboard/assets",       label: "Assets",            icon: Package,         roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
-  { href: "/dashboard/allocations",  label: "Allocation & Transfer", icon: ArrowLeftRight, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
-  { href: "/dashboard/bookings",     label: "Resource Booking",  icon: CalendarDays,    roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
-  { href: "/dashboard/maintenance",  label: "Maintenance",       icon: Wrench,          roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
-  { href: "/dashboard/audit",        label: "Audit",             icon: ClipboardCheck,  roles: ['ADMIN', 'MANAGER'] },
-  { href: "/dashboard/reports",      label: "Reports",           icon: BarChart2,       roles: ['ADMIN', 'MANAGER'] },
-  { href: "/dashboard/activity",     label: "Notifications",     icon: Bell,            roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+  { href: "/dashboard",              label: "Dashboard",             icon: LayoutDashboard, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+  { href: "/dashboard/organization", label: "Organization Setup",    icon: Building2,       roles: ['ADMIN'] },
+  { href: "/dashboard/assets",       label: "Assets",                icon: Package,         roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+  { href: "/dashboard/allocations",  label: "Allocation & Transfer", icon: ArrowLeftRight,  roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+  { href: "/dashboard/bookings",     label: "Resource Booking",      icon: CalendarDays,    roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+  { href: "/dashboard/maintenance",  label: "Maintenance",           icon: Wrench,          roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+  { href: "/dashboard/audit",        label: "Audit",                 icon: ClipboardCheck,  roles: ['ADMIN', 'MANAGER'] },
+  { href: "/dashboard/reports",      label: "Reports",               icon: BarChart2,       roles: ['ADMIN', 'MANAGER'] },
+  { href: "/dashboard/activity",     label: "Notifications",         icon: Bell,            roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
 ];
+
+const ROLE_META: Record<string, { label: string; color: string; bg: string; Icon: any }> = {
+  ADMIN: {
+    label: "Administrator",
+    color: "text-purple-700 dark:text-purple-300",
+    bg: "bg-purple-500/10 border-purple-500/20",
+    Icon: Shield,
+  },
+  MANAGER: {
+    label: "Manager",
+    color: "text-blue-700 dark:text-blue-300",
+    bg: "bg-blue-500/10 border-blue-500/20",
+    Icon: Building,
+  },
+  EMPLOYEE: {
+    label: "Employee",
+    color: "text-teal-700 dark:text-teal-300",
+    bg: "bg-teal-500/10 border-teal-500/20",
+    Icon: UserCircle2,
+  },
+};
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
+  const userRoles = roleNames(user?.roles);
+  const role = primaryRole(user?.roles);
+  const roleMeta = ROLE_META[role] ?? ROLE_META.EMPLOYEE;
 
   const handleLogout = () => {
     logout();
@@ -32,28 +60,31 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex flex-col w-56 shrink-0 h-screen sticky top-0 glass border-r-0 border-r-[rgba(255,255,255,0.05)] shadow-xl z-10">
+    <aside className="flex flex-col w-60 shrink-0 h-screen sticky top-0 border-r shadow-xl z-10" style={{ background: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
       {/* Logo */}
-      <div className="px-5 py-6 flex flex-col justify-center border-b" style={{ borderColor: "var(--border-subtle)" }}>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.5)]">
-            <Package size={16} className="text-white" />
+      <div className="px-5 py-5 flex flex-col justify-center border-b" style={{ borderColor: "var(--border-subtle)" }}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-hover))" }}>
+            <Package size={18} className="text-white" />
           </div>
-          <span className="text-[16px] font-bold tracking-wide" style={{ color: "var(--text-primary)" }}>AssetFlow</span>
+          <span className="text-[17px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>AssetFlow</span>
         </div>
         {user && (
-          <div className="mt-4 flex flex-col">
-            <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider">{user.roles[0]}</span>
-            <span className="text-[12px] truncate" style={{ color: "var(--text-secondary)" }}>{user.email}</span>
+          <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${roleMeta.bg}`}>
+            <roleMeta.Icon size={16} className={roleMeta.color} />
+            <div className="min-w-0">
+              <div className={`text-[11px] font-bold uppercase tracking-wider ${roleMeta.color}`}>{roleMeta.label}</div>
+              <div className="text-[12px] truncate font-medium" style={{ color: "var(--text-secondary)" }}>{user.email}</div>
+            </div>
           </div>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
+      <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-0.5">
         {NAV.filter(({ roles }) => {
-          if (!roles || !user?.roles) return true;
-          return roles.some(r => user.roles.includes(r));
+          if (!roles || !userRoles.length) return true;
+          return roles.some(r => userRoles.includes(r));
         }).map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
           return (
@@ -61,27 +92,39 @@ export function Sidebar() {
               key={href}
               href={href}
               className={clsx(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-200 group relative",
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 group relative",
                 active
-                  ? "bg-blue-600/15 text-blue-400 shadow-[inset_4px_0_0_var(--accent)]"
-                  : "hover:bg-white/5"
+                  ? "shadow-[inset_3px_0_0_var(--accent)]"
+                  : "hover:bg-slate-500/8"
               )}
-              style={active ? {} : { color: "var(--text-secondary)" }}
+              style={active
+                ? { background: "var(--accent-glow)", color: "var(--accent)" }
+                : { color: "var(--text-secondary)" }
+              }
             >
-              <Icon size={16} className={clsx("transition-transform group-hover:scale-110 duration-200", active ? "text-blue-400" : "text-slate-400")} />
-              {label}
+              <Icon size={17} className="shrink-0 transition-transform group-hover:scale-110 duration-200" />
+              <span className="truncate">{label}</span>
             </Link>
           );
         })}
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+      <div className="p-3 border-t space-y-0.5" style={{ borderColor: "var(--border-subtle)" }}>
+        <button
+          onClick={toggleTheme}
+          className="mb-1 flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-[13px] font-semibold hover:bg-slate-500/10 transition-colors"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+          {theme === "dark" ? "Light Mode" : "Dark Mode"}
+        </button>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-[13px] font-medium hover:bg-white/5 transition-colors text-red-400/80 hover:text-red-400"
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-[13px] font-semibold hover:bg-red-500/10 transition-colors"
+          style={{ color: "var(--danger)" }}
         >
-          <LogOut size={16} />
+          <LogOut size={17} />
           Sign Out
         </button>
       </div>

@@ -18,7 +18,8 @@ export function FilterBar({ search, onSearch, placeholder = "Search...", childre
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           placeholder={placeholder}
-          className="w-full pl-10 pr-4 py-2 bg-black/20 border border-[rgba(255,255,255,0.05)] rounded-lg text-[13px] text-white placeholder-slate-500 outline-none transition-all focus:border-blue-500 focus:bg-black/40"
+          className="w-full pl-10 pr-4 py-2 border rounded-lg text-[13px] placeholder-slate-500 outline-none transition-all"
+          style={{ background: "var(--bg-elevated)", borderColor: "var(--border)", color: "var(--text-primary)" }}
         />
       </div>
       {children && <div className="flex items-center gap-3">{children}</div>}
@@ -31,11 +32,11 @@ export function Select({ value, onChange, options }: { value: string; onChange: 
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="px-4 py-2 rounded-lg border text-[13px] outline-none transition-all focus:border-blue-500 appearance-none cursor-pointer"
-      style={{ background: "rgba(0,0,0,0.2)", borderColor: "rgba(255,255,255,0.05)", color: "var(--text-primary)" }}
+      className="px-4 py-2 rounded-lg border text-[13px] outline-none transition-all appearance-none cursor-pointer"
+      style={{ background: "var(--bg-elevated)", borderColor: "var(--border)", color: "var(--text-primary)" }}
     >
       {options.map((o) => (
-        <option key={o.value} value={o.value} className="bg-[#0f1117] text-slate-300">{o.label}</option>
+        <option key={o.value} value={o.value}>{o.label}</option>
       ))}
     </select>
   );

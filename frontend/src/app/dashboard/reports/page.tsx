@@ -3,7 +3,9 @@ import { useState, useEffect, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Btn } from "@/components/ui/Modal";
-import { Download, TrendingDown, PieChart, AlertCircle } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Spinner } from "@/components/ui/Spinner";
+import { Download, TrendingDown, PieChart, AlertCircle, BarChart3 } from "lucide-react";
 
 export default function ReportsPage() {
   const [tab, setTab] = useState<"overview" | "depreciation" | "utilization" | "compliance">("depreciation");
@@ -50,24 +52,24 @@ export default function ReportsPage() {
         }
       />
 
-      <div className="flex gap-4 mb-6 border-b border-[rgba(255,255,255,0.05)]">
-        <button 
-          className={`px-4 py-2 text-[13px] tracking-wide transition-all ${tab === "overview" ? "border-b-2 border-blue-500 font-medium text-blue-400" : "border-b-2 border-transparent text-slate-500 hover:text-slate-300"}`}
+      <div className="flex gap-2 mb-6">
+        <button
+          className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all border ${tab === "overview" ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-glow)]" : "border-transparent text-[var(--text-secondary)] hover:bg-slate-500/10"}`}
           onClick={() => setTab("overview")}
         >
-          <PieChart size={14} className="inline mr-2" /> Overview
+          <PieChart size={14} className="inline mr-2" />Overview
         </button>
-        <button 
-          className={`px-4 py-2 text-[13px] tracking-wide transition-all ${tab === "depreciation" ? "border-b-2 border-blue-500 font-medium text-blue-400" : "border-b-2 border-transparent text-slate-500 hover:text-slate-300"}`}
+        <button
+          className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all border ${tab === "depreciation" ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-glow)]" : "border-transparent text-[var(--text-secondary)] hover:bg-slate-500/10"}`}
           onClick={() => setTab("depreciation")}
         >
-          <TrendingDown size={14} className="inline mr-2" /> Depreciation
+          <TrendingDown size={14} className="inline mr-2" />Depreciation
         </button>
-        <button 
-          className={`px-4 py-2 text-[13px] tracking-wide transition-all ${tab === "utilization" ? "border-b-2 border-blue-500 font-medium text-blue-400" : "border-b-2 border-transparent text-slate-500 hover:text-slate-300"}`}
+        <button
+          className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all border ${tab === "utilization" ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-glow)]" : "border-transparent text-[var(--text-secondary)] hover:bg-slate-500/10"}`}
           onClick={() => setTab("utilization")}
         >
-          <AlertCircle size={14} className="inline mr-2" /> Compliance
+          <AlertCircle size={14} className="inline mr-2" />Compliance
         </button>
       </div>
 
@@ -88,7 +90,7 @@ export default function ReportsPage() {
               </thead>
               <tbody>
                 {loading ? (
-                   <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">Generating report...</td></tr>
+                   <tr><td colSpan={5} className="px-5 py-8"><Spinner /></td></tr>
                 ) : depreciationData.length === 0 ? (
                    <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">No assets available to calculate depreciation.</td></tr>
                 ) : (
@@ -111,11 +113,11 @@ export default function ReportsPage() {
       )}
       
       {tab !== "depreciation" && (
-        <div className="glass rounded-xl p-12 flex flex-col items-center justify-center text-center border-[rgba(255,255,255,0.02)] h-64">
-           <AlertCircle size={32} className="text-slate-600 mb-4" />
-           <p className="text-[14px] text-slate-400 font-medium">Module Coming Soon</p>
-           <p className="text-[12px] text-slate-500 max-w-sm mt-1">This report is planned for the next release.</p>
-        </div>
+        <EmptyState
+          icon={BarChart3}
+          title="Report Coming Soon"
+          description="This analytics module is planned for the next release. The Depreciation report is available now."
+        />
       )}
     </div>
   );

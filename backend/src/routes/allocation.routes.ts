@@ -30,7 +30,7 @@ router.post('/', requireManager, async (req, res, next) => {
       req.user!.organizationId,
       assetId,
       req.user!.userId,
-      { allocatedToUserId, notes }
+      { allocatedToUserId, issueNotes: notes }
     );
     res.status(201).json(allocation);
   } catch (error) {
@@ -40,9 +40,10 @@ router.post('/', requireManager, async (req, res, next) => {
 
 router.post('/:id/return', requireManager, async (req, res, next) => {
   try {
+    const allocationId = String(req.params.id);
     // Basic implementation for return.
     const allocation = await prisma.assetAllocation.update({
-      where: { id: req.params.id },
+      where: { id: allocationId },
       data: {
         returnedAt: new Date(),
         status: 'RETURNED'

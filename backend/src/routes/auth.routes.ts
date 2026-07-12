@@ -35,7 +35,7 @@ router.post('/users/:userId/promote', requireAdmin, async (req, res, next) => {
     const { role } = req.body;
     const result = await AuthService.promoteEmployee(
       req.user!.organizationId,
-      userId,
+      userId as string,
       role
     );
     res.json(result);
