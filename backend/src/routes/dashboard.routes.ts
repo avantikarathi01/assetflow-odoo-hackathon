@@ -51,7 +51,16 @@ router.get('/', async (req, res, next) => {
         status: log.action
       };
     }));
-    res.status(200).json({ ...kpis, recentActivity, upcomingEvents });
+    const myAssets = await prisma.assetAllocation.findMany({
+      where: {
+        organizationId: req.user!.organizationId,
+        allocatedToUserId: req.user!.id,
+        status: 'ACTIVE'
+      },
+      include: { asset: true }
+    });
+
+    res.status(200).json({ ...kpis, recentActivity, upcomingEvents, myAssets });
   } catch (error: any) {
     next(error);
   }

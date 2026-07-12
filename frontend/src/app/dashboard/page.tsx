@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [kpis, setKpis] = useState<DashboardKpis | null>(null);
   const [activity, setActivity] = useState<RecentActivity[]>([]);
   const [events, setEvents] = useState<DashboardEvent[]>([]);
+  const [myAssets, setMyAssets] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
   const [loading, setLoading] = useState(true);
 
@@ -31,6 +32,7 @@ export default function DashboardPage() {
         setKpis(data);
         setActivity(data.recentActivity || []);
         setEvents(data.upcomingEvents || []);
+        setMyAssets(data.myAssets || []);
       })
       .catch(() => {
         // Graceful fallback
@@ -45,6 +47,7 @@ export default function DashboardPage() {
     kpis,
     activity,
     events,
+    myAssets,
     selectedDate,
     setSelectedDate,
     loading

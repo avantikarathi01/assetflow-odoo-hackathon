@@ -286,7 +286,7 @@ export function ManagerPortal({ kpis, activity, events, selectedDate, setSelecte
 // ---------------------------------------------------------
 // 3. EMPLOYEE PORTAL
 // ---------------------------------------------------------
-export function EmployeePortal({ events, selectedDate, setSelectedDate }: any) {
+export function EmployeePortal({ events, selectedDate, setSelectedDate, myAssets }: any) {
   return (
     <div className="animate-fade-in">
       <div className="mb-8 flex items-center justify-between p-4 rounded-2xl border" style={{ background: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
@@ -316,6 +316,29 @@ export function EmployeePortal({ events, selectedDate, setSelectedDate }: any) {
             </Link>
           </div>
           
+          <h2 className="text-[15px] font-bold mb-4 flex items-center gap-2 mt-8" style={{ color: "var(--text-primary)" }}>
+            <Package size={16} style={{ color: "var(--accent)" }} /> My Assigned Assets
+          </h2>
+          <div className="space-y-3 mb-8">
+             {myAssets?.length === 0 ? (
+               <div className="glass-card rounded-xl p-6 text-center border border-dashed flex flex-col items-center gap-2 text-[13px]" style={{ borderColor: "var(--border-subtle)", color: "var(--text-muted)" }}>
+                 <span>No assets currently assigned to you.</span>
+               </div>
+             ) : (
+               myAssets?.map((a: any) => (
+                 <div key={a.id} className="p-4 rounded-xl border flex justify-between items-center transition-all hover:-translate-y-[1px] hover:shadow-sm" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
+                   <div>
+                     <p className="text-[14px] font-bold" style={{ color: "var(--text-primary)" }}>{a.asset?.name}</p>
+                     <p className="text-[12px] font-medium mt-0.5" style={{ color: "var(--text-secondary)" }}>Tag: {a.asset?.assetTag}</p>
+                   </div>
+                   <div className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-teal-500/10 text-teal-500 dark:text-teal-400">
+                     {a.status}
+                   </div>
+                 </div>
+               ))
+             )}
+          </div>
+
           <h2 className="text-[15px] font-bold mb-4 flex items-center gap-2 mt-8" style={{ color: "var(--text-primary)" }}>
             <Zap size={16} style={{ color: "var(--accent)" }} /> Self Service
           </h2>
