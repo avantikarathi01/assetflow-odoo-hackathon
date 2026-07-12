@@ -12,6 +12,9 @@ import notificationRoutes from './routes/notification.routes';
 import bookingRoutes from './routes/booking.routes';
 import reportRoutes from './routes/report.routes';
 import activityLogRoutes from './routes/activity-log.routes';
+import metadataRoutes from './routes/metadata.routes';
+import locationRoutes from './routes/location.routes';
+import allocationRoutes from './routes/allocation.routes';
 import { startScheduler } from './jobs/scheduler';
 
 const app = express();
@@ -40,6 +43,9 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
+app.use('/api/metadata', metadataRoutes);
+app.use('/api/locations', locationRoutes);
+app.use('/api/allocations', allocationRoutes);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

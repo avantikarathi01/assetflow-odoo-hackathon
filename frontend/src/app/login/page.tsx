@@ -9,6 +9,7 @@ import Link from "next/link";
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
+  const [organizationSlug, setOrganizationSlug] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -21,7 +22,7 @@ export default function LoginPage() {
     try {
       const res = await apiFetch("/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, organizationSlug }),
       });
       login(res.data.token, res.data.user);
       router.push("/dashboard");
@@ -53,7 +54,47 @@ export default function LoginPage() {
             </div>
           )}
 
+          {/* Hackathon Demo Roles */}
+          <div className="mb-4 space-y-2 pb-4 border-b" style={{ borderColor: "var(--border)" }}>
+            <p className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>Quick Login (Demo Roles):</p>
+            <div className="flex gap-2">
+              <button 
+                type="button" 
+                onClick={() => { setEmail(`admin@${organizationSlug || 'acme-corp'}.com`); setPassword("Password123!"); }}
+                className="flex-1 py-1 rounded border text-[11px] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+              >
+                Admin
+              </button>
+              <button 
+                type="button" 
+                onClick={() => { setEmail(`manager@${organizationSlug || 'acme-corp'}.com`); setPassword("Password123!"); }}
+                className="flex-1 py-1 rounded border text-[11px] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+              >
+                Manager
+              </button>
+              <button 
+                type="button" 
+                onClick={() => { setEmail(`employee@${organizationSlug || 'acme-corp'}.com`); setPassword("Password123!"); }}
+                className="flex-1 py-1 rounded border text-[11px] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+              >
+                Employee
+              </button>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <label className="block text-[11px] font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Organization ID</label>
+              <input
+                type="text" required value={organizationSlug} onChange={(e) => setOrganizationSlug(e.target.value)}
+                placeholder="acme-corp"
+                className="w-full px-3 py-2 rounded border text-[12px] outline-none focus:border-blue-600"
+                style={{ background: "var(--bg-elevated)", borderColor: "var(--border)", color: "var(--text-primary)" }}
+              />
+            </div>
             <div>
               <label className="block text-[11px] font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Email</label>
               <input

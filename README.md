@@ -132,8 +132,9 @@ JWT_SECRET="your_super_secret_jwt_key_here"
 Apply the PostgreSQL schema and generate the Prisma client:
 ```bash
 cd backend
-npx prisma migrate dev
 npx prisma generate
+npx prisma migrate dev --name init
+npx prisma db seed
 cd ..
 ```
 
@@ -168,12 +169,12 @@ npx tsx scripts/test-roles.ts
 
 ## 📈 Roadmap
 
-- [ ] **Frontend Dashboards:** Polish interactive KPI screens and Asset Directories.
-- [ ] **Interactive Bookings:** Build the rich availability calendar with real-time hold countdowns.
+- [x] **Frontend Dashboards:** Polish interactive KPI screens and Asset Directories.
+- [x] **Interactive Bookings:** Build the rich availability calendar with real-time hold countdowns.
 - [ ] **Advanced Reporting:** Export workflows, SLA escalation tracking, and maintenance analytics.
 - [ ] **Media Management:** Integrate Cloudinary for condition-report images and avatar uploads.
 
 ---
 <div align="center">
   <i>Built with ❤️ for the Odoo Hackathon</i>
-</div> 
+</div>

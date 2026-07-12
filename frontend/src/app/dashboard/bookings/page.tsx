@@ -1,144 +1,172 @@
 "use client";
-import { useState } from "react";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { FilterBar, Select } from "@/components/ui/FilterBar";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import { Modal, FormField, Input, SelectField, Btn } from "@/components/ui/Modal";
+import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
-import { Plus } from "lucide-react";
-
-// TODO: map to backend API
-const MOCK_RESOURCES = [
-  { id: "r1", name: "Conference Room A", type: "ROOM",      capacity: 12 },
-  { id: "r2", name: "Conference Room B", type: "ROOM",      capacity: 8 },
-  { id: "r3", name: "Projector Cart 1",  type: "EQUIPMENT", capacity: 1 },
-  { id: "r4", name: "Training Lab",      type: "ROOM",      capacity: 20 },
-];
-
-const MOCK_BOOKINGS = [
-  { id: "1", resource: "Conference Room A", bookedBy: "John Doe",   start: "2025-01-22 09:00", end: "2025-01-22 11:00", status: "CONFIRMED",  purpose: "Sprint Planning" },
-  { id: "2", resource: "Conference Room B", bookedBy: "Sarah Kim",  start: "2025-01-22 14:00", end: "2025-01-22 15:00", status: "HELD",       purpose: "1:1 Meeting" },
-  { id: "3", resource: "Projector Cart 1",  bookedBy: "Mike Chen",  start: "2025-01-23 10:00", end: "2025-01-23 12:00", status: "CONFIRMED",  purpose: "Client Demo" },
-  { id: "4", resource: "Training Lab",      bookedBy: "Lisa Park",  start: "2025-01-20 09:00", end: "2025-01-20 17:00", status: "COMPLETED",  purpose: "Onboarding" },
-  { id: "5", resource: "Conference Room A", bookedBy: "Bob Smith",  start: "2025-01-19 13:00", end: "2025-01-19 14:00", status: "CANCELLED",  purpose: "Budget Review" },
-];
-
-const STATUS_OPTS = [
-  { value: "", label: "All Statuses" },
-  { value: "HELD", label: "Held" },
-  { value: "CONFIRMED", label: "Confirmed" },
-  { value: "CHECKED_IN", label: "Checked In" },
-  { value: "COMPLETED", label: "Completed" },
-  { value: "CANCELLED", label: "Cancelled" },
-];
+import { useAuth } from "@/lib/auth-context";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Modal, FormField, Input, SelectField, Btn } from "@/components/ui/Modal";
+import { CalendarDays, Clock, MapPin } from "lucide-react";
 
 export default function BookingsPage() {
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const { user } = useAuth();
+  const [resources, setResources] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
+  
+  const [selectedResource, setSelectedResource] = useState("");
   const [modal, setModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ resourceId: "", startAt: "", endAt: "", purpose: "" });
+  const [success, setSuccess] = useState("");
 
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  const filtered = MOCK_BOOKINGS.filter((b) => {
-    const q = search.toLowerCase();
-    return (!q || b.resource.toLowerCase().includes(q) || b.bookedBy.toLowerCase().includes(q))
-      && (!statusFilter || b.status === statusFilter);
+  const [form, setForm] = useState({
+    startAt: "", endAt: "", purpose: ""
   });
 
-  const handleBook = async (e: React.FormEvent) => {
-    e.preventDefault(); setError(""); setSaving(true);
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
     try {
-      await apiFetch("/bookings", { method: "POST", body: JSON.stringify(form) });
-      setModal(false);
-    } catch (err: unknown) { setError(err instanceof Error ? err.message : "Failed"); }
-    finally { setSaving(false); }
+      const [res, bks] = await Promise.all([
+        apiFetch("/bookings/resources"),
+        apiFetch("/bookings")
+      ]);
+      setResources(res);
+      setBookings(bks);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
+  const handleBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(""); setSuccess(""); setSaving(true);
+    try {
+      await apiFetch("/bookings", { 
+        method: "POST", 
+        body: JSON.stringify({ ...form, resourceId: selectedResource }) 
+      });
+      setSuccess("Booking created successfully!");
+      setModal(false);
+      fetchData();
+    } catch (err: any) {
+      setError(err.message || "Failed to book slot");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setF = (k: string) => (e: any) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  // Filter bookings for selected resource today
+  const resourceBookings = bookings.filter(b => b.resourceId === selectedResource);
+
   return (
-    <div>
-      <PageHeader
-        title="Resource Booking"
-        subtitle="Shared rooms and equipment scheduling"
-        actions={<Btn onClick={() => setModal(true)}><Plus size={12} className="inline mr-1" />New Booking</Btn>}
+    <div className="animate-fade-in max-w-4xl">
+      <PageHeader 
+        title="Resource Booking" 
+        subtitle="Reserve shared spaces, vehicles, and equipment with overlap prevention."
+        actions={
+          selectedResource ? (
+            <Btn onClick={() => { setForm({ startAt:"", endAt:"", purpose:"" }); setModal(true); }}>
+              Book Slot
+            </Btn>
+          ) : undefined
+        }
       />
 
-      {/* Resource availability summary */}
-      <div className="grid grid-cols-4 gap-3 mb-5">
-        {MOCK_RESOURCES.map((r) => (
-          <div key={r.id} className="rounded-lg border p-3" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
-            <p className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>{r.name}</p>
-            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{r.type} · Cap: {r.capacity}</p>
-            <div className="mt-2">
-              <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                Available
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <FilterBar search={search} onSearch={setSearch} placeholder="Search resource or user…">
-        <Select value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTS} />
-      </FilterBar>
-
-      <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--border)" }}>
-        <table className="w-full text-[12px]">
-          <thead>
-            <tr style={{ background: "var(--bg-elevated)", borderBottom: "1px solid var(--border)" }}>
-              {["Resource", "Booked By", "Start", "End", "Purpose", "Status", "Actions"].map((h) => (
-                <th key={h} className="text-left px-3 py-2.5 font-semibold" style={{ color: "var(--text-secondary)" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((b, i) => (
-              <tr key={b.id} className="border-t" style={{ borderColor: "var(--border-subtle)", background: i % 2 === 0 ? "var(--bg-surface)" : "var(--bg-base)" }}>
-                <td className="px-3 py-2.5 font-medium" style={{ color: "var(--text-primary)" }}>{b.resource}</td>
-                <td className="px-3 py-2.5" style={{ color: "var(--text-secondary)" }}>{b.bookedBy}</td>
-                <td className="px-3 py-2.5 font-mono text-[11px]" style={{ color: "var(--text-secondary)" }}>{b.start}</td>
-                <td className="px-3 py-2.5 font-mono text-[11px]" style={{ color: "var(--text-secondary)" }}>{b.end}</td>
-                <td className="px-3 py-2.5" style={{ color: "var(--text-secondary)" }}>{b.purpose}</td>
-                <td className="px-3 py-2.5"><StatusBadge status={b.status} /></td>
-                <td className="px-3 py-2.5">
-                  {b.status === "HELD" && (
-                    <button className="text-[11px] px-2 py-1 rounded border hover:opacity-80" style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}>
-                      Confirm
-                    </button>
-                  )}
-                  {b.status === "CONFIRMED" && (
-                    <button className="text-[11px] px-2 py-1 rounded border hover:opacity-80" style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}>
-                      Check In
-                    </button>
-                  )}
-                </td>
-              </tr>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-1 space-y-4">
+          <h2 className="text-[14px] font-semibold tracking-wide" style={{ color: "var(--text-primary)" }}>Available Resources</h2>
+          <div className="space-y-3">
+            {resources.map(r => (
+              <div 
+                key={r.id} 
+                onClick={() => setSelectedResource(r.id)}
+                className={`p-4 rounded-xl cursor-pointer transition-all duration-200 border ${selectedResource === r.id ? 'bg-blue-600/10 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)]' : 'glass hover:bg-white/5 border-[rgba(255,255,255,0.05)]'}`}
+              >
+                <h3 className="font-medium text-[14px] mb-1" style={{ color: "var(--text-primary)" }}>{r.name}</h3>
+                <div className="flex items-center gap-1 text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                  <MapPin size={12} /> {r.location?.name || "Main Office"}
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
+            {resources.length === 0 && <p className="text-[12px] text-slate-500">No resources available.</p>}
+          </div>
+        </div>
+
+        <div className="md:col-span-2">
+          {selectedResource ? (
+            <div className="glass-card rounded-xl p-6 min-h-[400px]">
+              <h2 className="text-[16px] font-semibold tracking-wide mb-6 pb-4 border-b border-[rgba(255,255,255,0.05)]" style={{ color: "var(--text-primary)" }}>
+                Booking Schedule
+              </h2>
+
+              <div className="space-y-4">
+                {resourceBookings.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <CalendarDays size={32} className="text-slate-600 mb-3" />
+                    <p className="text-[13px] text-slate-400 font-medium">No bookings yet.</p>
+                    <p className="text-[12px] text-slate-500 mt-1">This resource is completely free today.</p>
+                  </div>
+                ) : (
+                  resourceBookings.map(b => {
+                    const start = new Date(b.startAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+                    const end = new Date(b.endAt).toLocaleTimeString([], { timeStyle: 'short' });
+                    return (
+                      <div key={b.id} className="flex gap-4 p-4 rounded-lg bg-black/20 border border-[rgba(255,255,255,0.05)]">
+                        <div className="flex flex-col items-center justify-center px-4 border-r border-[rgba(255,255,255,0.05)] min-w-[120px]">
+                          <Clock size={16} className="text-blue-400 mb-1.5" />
+                          <span className="text-[11px] font-medium text-slate-300">{start}</span>
+                          <span className="text-[10px] text-slate-500">to {end}</span>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[13px] font-medium mb-1" style={{ color: "var(--text-primary)" }}>{b.purpose}</p>
+                          <p className="text-[12px]" style={{ color: "var(--text-secondary)" }}>Booked by {b.bookedBy?.firstName} {b.bookedBy?.lastName}</p>
+                          <span className={`inline-block mt-2 px-2 py-0.5 rounded border text-[9px] font-medium tracking-wide ${
+                            b.status === 'CONFIRMED' ? 'border-green-500/30 text-green-400 bg-green-500/10' :
+                            b.status === 'CANCELLED' ? 'border-red-500/30 text-red-400 bg-red-500/10' :
+                            'border-blue-500/30 text-blue-400 bg-blue-500/10'
+                          }`}>
+                            {b.status}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="glass rounded-xl p-8 flex flex-col items-center justify-center text-center h-full min-h-[400px] border-[rgba(255,255,255,0.02)]">
+              <CalendarDays size={32} className="text-slate-600 mb-4" />
+              <h3 className="text-[15px] font-medium text-slate-300 mb-2">Select a Resource</h3>
+              <p className="text-[13px] text-slate-500 max-w-sm">Choose a resource from the list to view its schedule and book a slot.</p>
+            </div>
+          )}
+        </div>
       </div>
 
-      <Modal open={modal} onClose={() => setModal(false)} title="New Resource Booking">
-        <form onSubmit={handleBook} className="space-y-3">
-          {error && <p className="text-[12px] text-red-400">{error}</p>}
-          <FormField label="Resource">
-            <SelectField required value={form.resourceId} onChange={set("resourceId")}>
-              <option value="">Select resource…</option>
-              {MOCK_RESOURCES.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </SelectField>
-          </FormField>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Start"><Input required type="datetime-local" value={form.startAt} onChange={set("startAt")} /></FormField>
-            <FormField label="End"><Input required type="datetime-local" value={form.endAt} onChange={set("endAt")} /></FormField>
+      <Modal open={modal} onClose={() => setModal(false)} title="Book Resource">
+        <form onSubmit={handleBooking} className="space-y-4">
+          {error && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg">{error}</div>}
+          
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Start Time">
+              <Input type="datetime-local" required value={form.startAt} onChange={setF("startAt")} />
+            </FormField>
+            <FormField label="End Time">
+              <Input type="datetime-local" required value={form.endAt} onChange={setF("endAt")} />
+            </FormField>
           </div>
-          <FormField label="Purpose"><Input value={form.purpose} onChange={set("purpose")} placeholder="Sprint Planning" /></FormField>
-          <div className="flex justify-end gap-2 pt-1">
+          
+          <FormField label="Purpose of Booking">
+            <Input required value={form.purpose} onChange={setF("purpose")} placeholder="Client meeting..." />
+          </FormField>
+          
+          <div className="flex justify-end gap-3 pt-4 border-t border-[rgba(255,255,255,0.05)]">
             <Btn variant="ghost" type="button" onClick={() => setModal(false)}>Cancel</Btn>
-            <Btn type="submit" disabled={saving}>{saving ? "Booking…" : "Book Resource"}</Btn>
+            <Btn type="submit" disabled={saving}>{saving ? "Booking..." : "Confirm Booking"}</Btn>
           </div>
         </form>
       </Modal>

@@ -1,130 +1,122 @@
 "use client";
-import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { KpiCard } from "@/components/ui/KpiCard";
+import { useState, useEffect, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
-import { BarChart2, TrendingUp, Package, Wrench } from "lucide-react";
-
-// TODO: map to backend API — utilization report
-const MOCK_TOP_ASSETS = [
-  { name: "Dell XPS 15",     tag: "AST-001", count: 12, dept: "Engineering" },
-  { name: "MacBook Pro M3",  tag: "AST-005", count: 9,  dept: "Design" },
-  { name: "iPad Pro",        tag: "AST-009", count: 7,  dept: "Sales" },
-  { name: "Epson Projector", tag: "AST-007", count: 6,  dept: "Operations" },
-  { name: "iPhone 14 Pro",   tag: "AST-002", count: 5,  dept: "Sales" },
-];
-
-const MOCK_STATUS_DIST = [
-  { status: "AVAILABLE",        count: 87, color: "#10b981" },
-  { status: "ALLOCATED",        count: 43, color: "#3b82f6" },
-  { status: "UNDER_MAINTENANCE",count: 6,  color: "#f59e0b" },
-  { status: "RESERVED",         count: 4,  color: "#8b5cf6" },
-  { status: "RETIRED",          count: 2,  color: "#6b7280" },
-];
-
-const MOCK_DEPT_DIST = [
-  { dept: "Engineering", count: 38 },
-  { dept: "Operations",  count: 27 },
-  { dept: "Sales",       count: 22 },
-  { dept: "Design",      count: 18 },
-  { dept: "Finance",     count: 15 },
-  { dept: "HR",          count: 12 },
-  { dept: "IT",          count: 10 },
-];
-
-const total = MOCK_STATUS_DIST.reduce((s, d) => s + d.count, 0);
-const deptMax = Math.max(...MOCK_DEPT_DIST.map((d) => d.count));
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Btn } from "@/components/ui/Modal";
+import { Download, TrendingDown, PieChart, AlertCircle } from "lucide-react";
 
 export default function ReportsPage() {
-  const [utilization, setUtilization] = useState<{ mostUsed: { name: string; tag: string; allocationCount: number }[] } | null>(null);
+  const [tab, setTab] = useState<"overview" | "depreciation" | "utilization" | "compliance">("depreciation");
+  const [assets, setAssets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch("/dashboard/utilization")
-      .then(setUtilization)
-      .catch(() => setUtilization({ mostUsed: MOCK_TOP_ASSETS.map((a) => ({ name: a.name, tag: a.tag, allocationCount: a.count })) }));
+    apiFetch("/assets").then(data => {
+      setAssets(data);
+      setLoading(false);
+    }).catch(console.error);
   }, []);
 
+  const depreciationData = useMemo(() => {
+    const data: Record<string, { count: number, original: number, current: number }> = {};
+    assets.forEach(a => {
+      const cat = a.category?.name || "Uncategorized";
+      if (!data[cat]) data[cat] = { count: 0, original: 0, current: 0 };
+      
+      const cost = parseFloat(a.purchaseCost) || 0;
+      // Simple mockup depreciation based on condition
+      let currentVal = cost;
+      if (a.condition === 'EXCELLENT') currentVal *= 0.9;
+      if (a.condition === 'GOOD') currentVal *= 0.7;
+      if (a.condition === 'FAIR') currentVal *= 0.4;
+      if (a.condition === 'POOR') currentVal *= 0.1;
+
+      data[cat].count += 1;
+      data[cat].original += cost;
+      data[cat].current += currentVal;
+    });
+    return Object.entries(data).map(([cat, stats]) => ({ category: cat, ...stats }));
+  }, [assets]);
+
   return (
-    <div>
-      <PageHeader title="Reports & Analytics" subtitle="Asset utilization and operational metrics" />
+    <div className="animate-fade-in max-w-5xl">
+      <PageHeader 
+        title="Reports & Analytics" 
+        subtitle="Generate insights into asset depreciation, utilization, and compliance."
+        actions={
+          <Btn variant="primary">
+            <Download size={14} className="inline mr-2" /> Export Report
+          </Btn>
+        }
+      />
 
-      {/* Summary KPIs */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
-        <KpiCard label="Total Assets"    value={total}  icon={<Package size={15} />}   accent="blue"  />
-        <KpiCard label="Utilization Rate" value="30.3%" icon={<TrendingUp size={15} />} accent="green" sub="Allocated / Total" />
-        <KpiCard label="Avg Allocations" value="4.2"   icon={<BarChart2 size={15} />}  accent="violet" sub="Per asset / month" />
-        <KpiCard label="Maintenance Rate" value="4.2%" icon={<Wrench size={15} />}     accent="amber" sub="Assets in repair" />
+      <div className="flex gap-4 mb-6 border-b border-[rgba(255,255,255,0.05)]">
+        <button 
+          className={`px-4 py-2 text-[13px] tracking-wide transition-all ${tab === "overview" ? "border-b-2 border-blue-500 font-medium text-blue-400" : "border-b-2 border-transparent text-slate-500 hover:text-slate-300"}`}
+          onClick={() => setTab("overview")}
+        >
+          <PieChart size={14} className="inline mr-2" /> Overview
+        </button>
+        <button 
+          className={`px-4 py-2 text-[13px] tracking-wide transition-all ${tab === "depreciation" ? "border-b-2 border-blue-500 font-medium text-blue-400" : "border-b-2 border-transparent text-slate-500 hover:text-slate-300"}`}
+          onClick={() => setTab("depreciation")}
+        >
+          <TrendingDown size={14} className="inline mr-2" /> Depreciation
+        </button>
+        <button 
+          className={`px-4 py-2 text-[13px] tracking-wide transition-all ${tab === "utilization" ? "border-b-2 border-blue-500 font-medium text-blue-400" : "border-b-2 border-transparent text-slate-500 hover:text-slate-300"}`}
+          onClick={() => setTab("utilization")}
+        >
+          <AlertCircle size={14} className="inline mr-2" /> Compliance
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        {/* Status Distribution */}
-        <div className="rounded-lg border p-4" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
-          <h2 className="text-[12px] font-semibold mb-4" style={{ color: "var(--text-primary)" }}>Asset Status Distribution</h2>
-          <div className="space-y-2.5">
-            {MOCK_STATUS_DIST.map((d) => (
-              <div key={d.status}>
-                <div className="flex justify-between mb-1">
-                  <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{d.status.replace("_", " ")}</span>
-                  <span className="text-[11px] font-medium" style={{ color: "var(--text-primary)" }}>{d.count} ({Math.round((d.count / total) * 100)}%)</span>
-                </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-elevated)" }}>
-                  <div className="h-full rounded-full transition-all" style={{ width: `${(d.count / total) * 100}%`, background: d.color }} />
-                </div>
-              </div>
-            ))}
+      {tab === "depreciation" && (
+        <div className="glass-card rounded-xl p-6">
+          <h2 className="text-[16px] font-semibold mb-6 tracking-wide" style={{ color: "var(--text-primary)" }}>Depreciation Report by Category</h2>
+          
+          <div className="rounded-xl border overflow-hidden border-[rgba(255,255,255,0.05)]">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b" style={{ borderColor: "var(--border-subtle)", background: "rgba(255,255,255,0.02)" }}>
+                  <th className="text-left px-5 py-4 font-medium" style={{ color: "var(--text-secondary)" }}>Category</th>
+                  <th className="text-left px-5 py-4 font-medium" style={{ color: "var(--text-secondary)" }}>Asset Count</th>
+                  <th className="text-left px-5 py-4 font-medium" style={{ color: "var(--text-secondary)" }}>Original Value</th>
+                  <th className="text-left px-5 py-4 font-medium" style={{ color: "var(--text-secondary)" }}>Current Est. Value</th>
+                  <th className="text-left px-5 py-4 font-medium" style={{ color: "var(--text-secondary)" }}>Value Loss</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                   <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">Generating report...</td></tr>
+                ) : depreciationData.length === 0 ? (
+                   <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">No assets available to calculate depreciation.</td></tr>
+                ) : (
+                  depreciationData.map((d, i) => (
+                    <tr key={i} className="border-b transition-colors hover:bg-white/5 border-[rgba(255,255,255,0.05)]">
+                      <td className="px-5 py-4 font-medium text-blue-400">{d.category}</td>
+                      <td className="px-5 py-4 text-slate-300">{d.count}</td>
+                      <td className="px-5 py-4 text-slate-300">${d.original.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                      <td className="px-5 py-4 font-medium text-white">${d.current.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                      <td className="px-5 py-4 text-red-400 font-medium">
+                        -${(d.original - d.current).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-
-        {/* Department Distribution */}
-        <div className="rounded-lg border p-4" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
-          <h2 className="text-[12px] font-semibold mb-4" style={{ color: "var(--text-primary)" }}>Assets by Department</h2>
-          <div className="space-y-2.5">
-            {MOCK_DEPT_DIST.map((d) => (
-              <div key={d.dept}>
-                <div className="flex justify-between mb-1">
-                  <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{d.dept}</span>
-                  <span className="text-[11px] font-medium" style={{ color: "var(--text-primary)" }}>{d.count}</span>
-                </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-elevated)" }}>
-                  <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${(d.count / deptMax) * 100}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
+      )}
+      
+      {tab !== "depreciation" && (
+        <div className="glass rounded-xl p-12 flex flex-col items-center justify-center text-center border-[rgba(255,255,255,0.02)] h-64">
+           <AlertCircle size={32} className="text-slate-600 mb-4" />
+           <p className="text-[14px] text-slate-400 font-medium">Module Coming Soon</p>
+           <p className="text-[12px] text-slate-500 max-w-sm mt-1">This report is planned for the next release.</p>
         </div>
-      </div>
-
-      {/* Most Allocated Assets */}
-      <div className="rounded-lg border" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
-        <div className="px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
-          <h2 className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>Most Allocated Assets</h2>
-        </div>
-        <table className="w-full text-[12px]">
-          <thead>
-            <tr style={{ background: "var(--bg-elevated)", borderBottom: "1px solid var(--border)" }}>
-              {["Rank", "Asset", "Tag", "Department", "Allocation Count", "Utilization"].map((h) => (
-                <th key={h} className="text-left px-3 py-2.5 font-semibold" style={{ color: "var(--text-secondary)" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {MOCK_TOP_ASSETS.map((a, i) => (
-              <tr key={a.tag} className="border-t" style={{ borderColor: "var(--border-subtle)", background: i % 2 === 0 ? "var(--bg-surface)" : "var(--bg-base)" }}>
-                <td className="px-3 py-2.5 font-bold text-[11px]" style={{ color: "var(--text-muted)" }}>#{i + 1}</td>
-                <td className="px-3 py-2.5 font-medium" style={{ color: "var(--text-primary)" }}>{a.name}</td>
-                <td className="px-3 py-2.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{a.tag}</td>
-                <td className="px-3 py-2.5" style={{ color: "var(--text-secondary)" }}>{a.dept}</td>
-                <td className="px-3 py-2.5 font-medium" style={{ color: "var(--text-primary)" }}>{a.count}</td>
-                <td className="px-3 py-2.5 w-32">
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-elevated)" }}>
-                    <div className="h-full rounded-full bg-blue-500" style={{ width: `${(a.count / 12) * 100}%` }} />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      )}
     </div>
   );
 }

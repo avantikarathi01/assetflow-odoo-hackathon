@@ -7,7 +7,7 @@ import Link from "next/link";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ orgName: "", adminName: "", email: "", password: "" });
+  const [form, setForm] = useState({ orgName: "", orgId: "", adminName: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -18,9 +18,20 @@ export default function RegisterPage() {
     setError("");
     setLoading(true);
     try {
+      const parts = form.adminName.trim().split(" ");
+      const firstName = parts[0] || "Admin";
+      const lastName = parts.slice(1).join(" ") || "User";
+
       await apiFetch("/auth/register", {
         method: "POST",
-        body: JSON.stringify({ organizationName: form.orgName, adminName: form.adminName, email: form.email, password: form.password }),
+        body: JSON.stringify({ 
+          organizationName: form.orgName, 
+          slug: form.orgId,
+          firstName, 
+          lastName, 
+          email: form.email, 
+          password: form.password 
+        }),
       });
       router.push("/login");
     } catch (err: unknown) {
@@ -53,6 +64,7 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-3">
             {[
               { key: "orgName",    label: "Organization Name", type: "text",     placeholder: "Acme Corp" },
+              { key: "orgId",      label: "Organization ID (Login Slug)", type: "text", placeholder: "acme-corp" },
               { key: "adminName",  label: "Your Name",         type: "text",     placeholder: "John Doe" },
               { key: "email",      label: "Admin Email",       type: "email",    placeholder: "admin@acme.com" },
               { key: "password",   label: "Password",          type: "password", placeholder: "••••••••" },

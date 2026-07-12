@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const registerSchema = z.object({
   organizationName: z.string().min(2, 'Organization name must be at least 2 characters'),
+  slug: z.string().min(2, 'Organization ID must be at least 2 characters'),
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
   lastName: z.string().min(2, 'Last name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),

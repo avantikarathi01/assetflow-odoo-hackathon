@@ -1,9 +1,22 @@
 import { Router } from 'express';
 import { LocationService } from '../modules/organizations/location.service';
 import { DepartmentService } from '../modules/organizations/department.service';
-import { requireAdmin } from '../middleware/auth';
+import { requireAdmin, requireAuth } from '../middleware/auth';
+import { prisma } from '../lib/db/prisma';
 
 const router = Router();
+
+router.get('/users', requireAuth, async (req, res, next) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { organizationId: req.user!.organizationId },
+      include: { department: true }
+    });
+    res.json(users);
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.post('/locations', requireAdmin, async (req, res, next) => {
   try {
@@ -29,6 +42,21 @@ router.post('/departments', requireAdmin, async (req, res, next) => {
       headUserId: data.headUserId || data.managerId
     });
     res.status(201).json(department);
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+router.post('/categories', requireAdmin, async (req, res, next) => {
+  try {
+    const category = await prisma.assetCategory.create({
+      data: {
+        organizationId: req.user!.organizationId,
+        name: req.body.name,
+        description: req.body.description
+      }
+    });
+    res.status(201).json(category);
   } catch (error: any) {
     next(error);
   }

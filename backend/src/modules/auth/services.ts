@@ -8,14 +8,14 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-do-not-use-in-prod
 
 export class AuthService {
   static async registerOrganization(data: RegisterDTO) {
-    const slug = data.organizationName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const slug = data.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
     
     // Use transaction for atomic registration
     return prisma.$transaction(async (tx) => {
       // 1. Check for existing organization
       const existingOrg = await tx.organization.findUnique({ where: { slug } });
       if (existingOrg) {
-        throw new ConflictError('Organization with this name already exists');
+        throw new ConflictError('Organization with this ID already exists');
       }
 
       // 2. Create organization
@@ -26,50 +26,50 @@ export class AuthService {
         },
       });
 
-      // 3. Create Admin Role
+      // 3. Create Roles
       const adminRole = await tx.role.create({
-        data: {
-          organizationId: org.id,
-          name: 'ADMIN',
-          description: 'Full administrative access',
-          isSystem: true,
-          permissions: ['*'],
-        },
+        data: { organizationId: org.id, name: 'ADMIN', description: 'Full administrative access', isSystem: true, permissions: ['*'] },
+      });
+      const managerRole = await tx.role.create({
+        data: { organizationId: org.id, name: 'MANAGER', description: 'Department or Location manager', isSystem: true, permissions: ['read', 'write'] },
+      });
+      const employeeRole = await tx.role.create({
+        data: { organizationId: org.id, name: 'EMPLOYEE', description: 'Standard employee', isSystem: true, permissions: ['read'] },
       });
 
-      // 4. Create User
+      // 4. Create Users
       const passwordHash = await bcrypt.hash(data.password, 12);
-      const user = await tx.user.create({
-        data: {
-          organizationId: org.id,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          passwordHash,
-        },
+      
+      // Admin User
+      const adminUser = await tx.user.create({
+        data: { organizationId: org.id, firstName: data.firstName, lastName: data.lastName, email: data.email, passwordHash },
       });
+      await tx.userRole.create({ data: { userId: adminUser.id, roleId: adminRole.id } });
 
-      // 5. Assign Role
-      await tx.userRole.create({
-        data: {
-          userId: user.id,
-          roleId: adminRole.id,
-        },
+      // Hackathon Shortcut: Auto-create Manager & Employee for testing RBAC
+      const managerUser = await tx.user.create({
+        data: { organizationId: org.id, firstName: 'Demo', lastName: 'Manager', email: `manager@${slug}.com`, passwordHash },
       });
+      await tx.userRole.create({ data: { userId: managerUser.id, roleId: managerRole.id } });
 
-      // 6. Log activity
+      const employeeUser = await tx.user.create({
+        data: { organizationId: org.id, firstName: 'Demo', lastName: 'Employee', email: `employee@${slug}.com`, passwordHash },
+      });
+      await tx.userRole.create({ data: { userId: employeeUser.id, roleId: employeeRole.id } });
+
+      // 5. Log activity
       await tx.activityLog.create({
         data: {
           organizationId: org.id,
-          actorId: user.id,
+          actorId: adminUser.id,
           action: 'CREATED',
           entityType: 'Organization',
           entityId: org.id,
-          reason: 'Initial Registration',
+          reason: 'Initial Registration with Demo Users',
         }
       });
 
-      return { organization: org, user: { id: user.id, email: user.email } };
+      return { organization: org, user: { id: adminUser.id, email: adminUser.email } };
     }, { timeout: 25000 });
   }
 

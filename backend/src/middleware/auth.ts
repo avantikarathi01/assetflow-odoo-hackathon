@@ -120,3 +120,10 @@ export async function requireTransferApprovalAccess(req: Request, res: Response,
 
   return res.status(403).json({ error: 'Forbidden: You must be an Asset Manager or the Department Head to approve this transfer' });
 }
+
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized: User not found' });
+  }
+  next();
+}

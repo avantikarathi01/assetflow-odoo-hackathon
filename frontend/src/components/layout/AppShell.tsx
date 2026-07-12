@@ -15,10 +15,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (!token) return null;
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg-base)" }}>
+    <div className="flex h-screen overflow-hidden animate-fade-in bg-transparent">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto p-5">
-        {children}
+      <main className="flex-1 overflow-y-auto p-6 md:p-8">
+        <div className="max-w-6xl mx-auto w-full">
+          {children}
+        </div>
       </main>
     </div>
   );

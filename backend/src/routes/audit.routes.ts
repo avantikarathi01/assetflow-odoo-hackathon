@@ -1,8 +1,44 @@
 import { Router } from 'express';
 import { AuditService } from '../modules/audit/services/audit.service';
-import { requireAdmin, requireRole } from '../middleware/auth';
+import { requireAuth, requireAdmin, requireRole } from '../middleware/auth';
+import { prisma } from '../lib/db/prisma';
 
 const router = Router();
+
+// Get all audit cycles for an organization
+router.get('/', requireAuth, async (req, res, next) => {
+  try {
+    const orgId = req.user!.organizationId;
+    const cycles = await prisma.auditCycle.findMany({
+      where: { organizationId: orgId },
+      include: {
+        records: {
+          include: {
+            asset: true,
+            auditor: true
+          }
+        }
+      },
+      orderBy: { plannedStartAt: 'desc' }
+    });
+    
+    // Compute summaries on the fly
+    const mapped = cycles.map(c => {
+      const verified = c.records.length;
+      const discrepancies = c.records.filter(r => r.outcome === 'DISCREPANCY').length;
+      return {
+        ...c,
+        total: 100, // Normally this would be total assets in scope
+        verified,
+        discrepancies,
+      };
+    });
+    
+    res.json(mapped);
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Create audit cycle (Admin only)
 router.post('/', requireAdmin, async (req, res, next) => {

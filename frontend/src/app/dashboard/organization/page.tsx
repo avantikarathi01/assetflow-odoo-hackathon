@@ -1,167 +1,160 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Modal, FormField, Input, SelectField, Btn } from "@/components/ui/Modal";
+import { Modal, FormField, Input, Btn, SelectField } from "@/components/ui/Modal";
 import { apiFetch } from "@/lib/api";
-import { Plus, Building2, MapPin } from "lucide-react";
-
-// TODO: map to backend API — fetch departments and locations
-const MOCK_DEPTS = [
-  { id: "1", name: "Engineering",  code: "ENG", location: "HQ Floor 3",  manager: "Alice Wong" },
-  { id: "2", name: "Operations",   code: "OPS", location: "HQ Floor 1",  manager: "Bob Smith" },
-  { id: "3", name: "Finance",      code: "FIN", location: "HQ Floor 2",  manager: "Carol Lee" },
-];
-
-const MOCK_LOCS = [
-  { id: "1", name: "HQ Floor 1", type: "OFFICE",     address: "123 Main St, Floor 1" },
-  { id: "2", name: "HQ Floor 2", type: "OFFICE",     address: "123 Main St, Floor 2" },
-  { id: "3", name: "HQ Floor 3", type: "OFFICE",     address: "123 Main St, Floor 3" },
-  { id: "4", name: "Warehouse A", type: "WAREHOUSE",  address: "456 Storage Rd" },
-];
 
 export default function OrganizationPage() {
-  const [tab, setTab] = useState<"departments" | "locations">("departments");
-  const [deptModal, setDeptModal] = useState(false);
-  const [locModal, setLocModal] = useState(false);
-  const [deptForm, setDeptForm] = useState({ name: "", code: "", locationId: "" });
-  const [locForm, setLocForm] = useState({ name: "", type: "OFFICE", address: "" });
+  const { user } = useAuth();
+  const router = useRouter();
+  const [tab, setTab] = useState<"departments" | "categories" | "employees">("departments");
+  
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+
+  const [modal, setModal] = useState<"dept"|"cat"|null>(null);
+  const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
 
-  const setD = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setDeptForm((f) => ({ ...f, [k]: e.target.value }));
-  const setL = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setLocForm((f) => ({ ...f, [k]: e.target.value }));
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  const saveDept = async (e: React.FormEvent) => {
-    e.preventDefault(); setError(""); setSaving(true);
+  const fetchData = async () => {
     try {
-      await apiFetch("/organizations/departments", { method: "POST", body: JSON.stringify(deptForm) });
-      setDeptModal(false);
-    } catch (err: unknown) { setError(err instanceof Error ? err.message : "Failed"); }
-    finally { setSaving(false); }
+      const [meta, users] = await Promise.all([
+        apiFetch("/metadata"),
+        apiFetch("/org/users")
+      ]);
+      setDepartments(meta.departments);
+      setCategories(meta.categories);
+      setLocations(meta.locations);
+      setEmployees(users);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const saveLoc = async (e: React.FormEvent) => {
-    e.preventDefault(); setError(""); setSaving(true);
+  const setF = (k: string) => (e: any) => setForm((f: any) => ({ ...f, [k]: e.target.value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
     try {
-      await apiFetch("/organizations/locations", { method: "POST", body: JSON.stringify(locForm) });
-      setLocModal(false);
-    } catch (err: unknown) { setError(err instanceof Error ? err.message : "Failed"); }
-    finally { setSaving(false); }
+      if (modal === "dept") await apiFetch("/org/departments", { method: "POST", body: JSON.stringify(form) });
+      if (modal === "cat") await apiFetch("/org/categories", { method: "POST", body: JSON.stringify(form) });
+      setModal(null);
+      fetchData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  // Basic RBAC guard
+  if (user && !user.roles.includes("ADMIN")) {
+    return <div className="p-8 text-center text-red-400 glass-card rounded-xl">You do not have permission to view this page.</div>;
+  }
 
   const TAB_CLS = (t: string) =>
-    `px-3 py-1.5 text-[12px] rounded transition-colors ${tab === t ? "bg-blue-600/20 text-blue-400 font-medium" : "hover:bg-white/5"}`;
+    `px-4 py-2 text-[13px] font-medium border-b-2 transition-colors ${tab === t ? "border-blue-500 text-blue-400" : "border-transparent text-slate-500 hover:text-slate-300"}`;
 
   return (
-    <div>
-      <PageHeader
-        title="Organization Setup"
-        subtitle="Manage departments and physical locations"
+    <div className="animate-fade-in">
+      <PageHeader 
+        title="Organization Setup" 
+        subtitle="Manage departments, categories, and personnel structure"
         actions={
-          tab === "departments"
-            ? <Btn onClick={() => setDeptModal(true)}><Plus size={12} className="inline mr-1" />Add Department</Btn>
-            : <Btn onClick={() => setLocModal(true)}><Plus size={12} className="inline mr-1" />Add Location</Btn>
+          <Btn onClick={() => { setForm({}); setModal(tab === "categories" ? "cat" : "dept"); }}>
+            <Plus size={14} className="inline mr-2" /> Add {tab === "categories" ? "Category" : "Department"}
+          </Btn>
         }
       />
-
-      {/* Tabs */}
-      <div className="flex gap-1 mb-4 p-1 rounded-lg w-fit" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
-        <button className={TAB_CLS("departments")} style={tab !== "departments" ? { color: "var(--text-secondary)" } : {}} onClick={() => setTab("departments")}>
-          <Building2 size={12} className="inline mr-1.5" />Departments
-        </button>
-        <button className={TAB_CLS("locations")} style={tab !== "locations" ? { color: "var(--text-secondary)" } : {}} onClick={() => setTab("locations")}>
-          <MapPin size={12} className="inline mr-1.5" />Locations
-        </button>
+      
+      <div className="flex gap-4 mb-6 border-b" style={{ borderColor: "var(--border-subtle)" }}>
+        <button className={TAB_CLS("departments")} onClick={() => setTab("departments")}>Departments</button>
+        <button className={TAB_CLS("categories")} onClick={() => setTab("categories")}>Categories</button>
+        <button className={TAB_CLS("employees")} onClick={() => setTab("employees")}>Employees</button>
       </div>
 
-      {/* Departments Table */}
-      {tab === "departments" && (
-        <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--border)" }}>
-          <table className="w-full text-[12px]">
-            <thead>
-              <tr style={{ background: "var(--bg-elevated)", borderBottom: "1px solid var(--border)" }}>
-                {["Department", "Code", "Location", "Manager"].map((h) => (
-                  <th key={h} className="text-left px-3 py-2.5 font-semibold" style={{ color: "var(--text-secondary)" }}>{h}</th>
-                ))}
+      <div className="rounded-xl glass border overflow-hidden">
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="border-b" style={{ borderColor: "var(--border-subtle)", background: "rgba(255,255,255,0.02)" }}>
+              {tab === "departments" && <>
+                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Department Name</th>
+                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Code</th>
+                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Status</th>
+              </>}
+              {tab === "categories" && <>
+                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Category Name</th>
+                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Description</th>
+              </>}
+              {tab === "employees" && <>
+                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Name</th>
+                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Email</th>
+                <th className="text-left px-5 py-3 font-medium" style={{ color: "var(--text-secondary)" }}>Roles</th>
+              </>}
+            </tr>
+          </thead>
+          <tbody>
+            {tab === "departments" && departments.map((d, i) => (
+              <tr key={d.id} className="border-b transition-colors hover:bg-white/5" style={{ borderColor: "var(--border-subtle)" }}>
+                <td className="px-5 py-3.5" style={{ color: "var(--text-primary)" }}>{d.name}</td>
+                <td className="px-5 py-3.5" style={{ color: "var(--text-secondary)" }}>{d.code}</td>
+                <td className="px-5 py-3.5">
+                  <span className="px-3 py-1 rounded-full border border-green-500/30 text-green-400 text-[11px] font-medium tracking-wide bg-green-500/10">Active</span>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {MOCK_DEPTS.map((d, i) => (
-                <tr key={d.id} className="border-t" style={{ borderColor: "var(--border-subtle)", background: i % 2 === 0 ? "var(--bg-surface)" : "var(--bg-base)" }}>
-                  <td className="px-3 py-2.5 font-medium" style={{ color: "var(--text-primary)" }}>{d.name}</td>
-                  <td className="px-3 py-2.5" style={{ color: "var(--text-secondary)" }}>{d.code}</td>
-                  <td className="px-3 py-2.5" style={{ color: "var(--text-secondary)" }}>{d.location}</td>
-                  <td className="px-3 py-2.5" style={{ color: "var(--text-secondary)" }}>{d.manager}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Locations Table */}
-      {tab === "locations" && (
-        <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--border)" }}>
-          <table className="w-full text-[12px]">
-            <thead>
-              <tr style={{ background: "var(--bg-elevated)", borderBottom: "1px solid var(--border)" }}>
-                {["Location", "Type", "Address"].map((h) => (
-                  <th key={h} className="text-left px-3 py-2.5 font-semibold" style={{ color: "var(--text-secondary)" }}>{h}</th>
-                ))}
+            ))}
+            {tab === "categories" && categories.map((c, i) => (
+              <tr key={c.id} className="border-b transition-colors hover:bg-white/5" style={{ borderColor: "var(--border-subtle)" }}>
+                <td className="px-5 py-3.5 font-medium text-blue-400">{c.name}</td>
+                <td className="px-5 py-3.5" style={{ color: "var(--text-secondary)" }}>{c.description || "—"}</td>
               </tr>
-            </thead>
-            <tbody>
-              {MOCK_LOCS.map((l, i) => (
-                <tr key={l.id} className="border-t" style={{ borderColor: "var(--border-subtle)", background: i % 2 === 0 ? "var(--bg-surface)" : "var(--bg-base)" }}>
-                  <td className="px-3 py-2.5 font-medium" style={{ color: "var(--text-primary)" }}>{l.name}</td>
-                  <td className="px-3 py-2.5">
-                    <span className="px-2 py-0.5 rounded text-[11px] border" style={{ background: "var(--bg-elevated)", borderColor: "var(--border)", color: "var(--text-secondary)" }}>
-                      {l.type}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5" style={{ color: "var(--text-secondary)" }}>{l.address}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            ))}
+            {tab === "employees" && employees.map((e, i) => (
+              <tr key={e.id} className="border-b transition-colors hover:bg-white/5" style={{ borderColor: "var(--border-subtle)" }}>
+                <td className="px-5 py-3.5 font-medium" style={{ color: "var(--text-primary)" }}>{e.firstName} {e.lastName}</td>
+                <td className="px-5 py-3.5" style={{ color: "var(--text-secondary)" }}>{e.email}</td>
+                <td className="px-5 py-3.5">
+                  <span className="px-3 py-1 rounded-full border border-blue-500/30 text-blue-400 text-[11px] font-medium tracking-wide bg-blue-500/10">{e.roles[0]}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      {/* Add Department Modal */}
-      <Modal open={deptModal} onClose={() => setDeptModal(false)} title="Add Department">
-        <form onSubmit={saveDept} className="space-y-3">
-          {error && <p className="text-[12px] text-red-400">{error}</p>}
-          <FormField label="Department Name"><Input required value={deptForm.name} onChange={setD("name")} placeholder="Engineering" /></FormField>
-          <FormField label="Code"><Input required value={deptForm.code} onChange={setD("code")} placeholder="ENG" /></FormField>
-          <FormField label="Location">
-            <SelectField value={deptForm.locationId} onChange={setD("locationId")}>
-              <option value="">Select location…</option>
-              {MOCK_LOCS.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </SelectField>
-          </FormField>
-          <div className="flex justify-end gap-2 pt-1">
-            <Btn variant="ghost" type="button" onClick={() => setDeptModal(false)}>Cancel</Btn>
-            <Btn type="submit" disabled={saving}>{saving ? "Saving…" : "Create"}</Btn>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Add Location Modal */}
-      <Modal open={locModal} onClose={() => setLocModal(false)} title="Add Location">
-        <form onSubmit={saveLoc} className="space-y-3">
-          {error && <p className="text-[12px] text-red-400">{error}</p>}
-          <FormField label="Location Name"><Input required value={locForm.name} onChange={setL("name")} placeholder="HQ Floor 1" /></FormField>
-          <FormField label="Type">
-            <SelectField value={locForm.type} onChange={setL("type")}>
-              {["OFFICE", "WAREHOUSE", "REMOTE", "DATA_CENTER"].map((t) => <option key={t} value={t}>{t}</option>)}
-            </SelectField>
-          </FormField>
-          <FormField label="Address"><Input value={locForm.address} onChange={setL("address")} placeholder="123 Main St" /></FormField>
-          <div className="flex justify-end gap-2 pt-1">
-            <Btn variant="ghost" type="button" onClick={() => setLocModal(false)}>Cancel</Btn>
-            <Btn type="submit" disabled={saving}>{saving ? "Saving…" : "Create"}</Btn>
+      <Modal open={!!modal} onClose={() => setModal(null)} title={`Add ${modal === "dept" ? "Department" : "Category"}`}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {modal === "dept" && (
+            <>
+              <FormField label="Department Name"><Input required value={form.name || ""} onChange={setF("name")} placeholder="Engineering" /></FormField>
+              <FormField label="Department Code"><Input required value={form.code || ""} onChange={setF("code")} placeholder="ENG" /></FormField>
+              <FormField label="Location">
+                <SelectField required value={form.locationId || ""} onChange={setF("locationId")}>
+                  <option value="">Select location...</option>
+                  {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </SelectField>
+              </FormField>
+            </>
+          )}
+          {modal === "cat" && (
+            <>
+              <FormField label="Category Name"><Input required value={form.name || ""} onChange={setF("name")} placeholder="Electronics" /></FormField>
+              <FormField label="Description"><Input value={form.description || ""} onChange={setF("description")} placeholder="Laptops, Monitors..." /></FormField>
+            </>
+          )}
+          <div className="flex justify-end gap-3 pt-4 border-t border-[rgba(255,255,255,0.05)]">
+            <Btn variant="ghost" type="button" onClick={() => setModal(null)}>Cancel</Btn>
+            <Btn type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Btn>
           </div>
         </form>
       </Modal>

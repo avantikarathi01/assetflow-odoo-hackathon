@@ -1,19 +1,78 @@
 import { Router } from 'express';
 import { MaintenanceService } from '../modules/maintenance/services/maintenance.service';
-import { requireManager, requireRole } from '../middleware/auth';
+import { requireAuth, requireManager, requireRole } from '../middleware/auth';
 import { prisma } from '../lib/db/prisma';
 
 const router = Router();
 
-// Raise a maintenance request (any user)
-router.post('/', async (req, res, next) => {
+// Get all maintenance requests (from Frontend)
+router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const request = await MaintenanceService.raiseRequest(
-      req.user!.organizationId,
-      req.user!.userId,
-      req.body
-    );
-    res.status(201).json(request);
+    const orgId = req.user!.organizationId;
+    const maintenance = await prisma.maintenanceRequest.findMany({
+      where: { asset: { organizationId: orgId } },
+      include: {
+        asset: true,
+        requestedBy: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    // Transform to match frontend expected fields
+    const formatted = maintenance.map(m => ({
+      ...m,
+      reportedByUser: m.requestedBy,
+      reportedAt: m.createdAt,
+      description: m.issue
+    }));
+    res.json(formatted);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Create new maintenance request (from Frontend)
+router.post('/', requireAuth, async (req, res, next) => {
+  try {
+    const { assetId, issue, priority } = req.body;
+    const record = await prisma.maintenanceRequest.create({
+      data: {
+        assetId,
+        issue,
+        priority: priority || 'MEDIUM',
+        status: 'PENDING',
+        requestedById: req.user!.userId,
+        organizationId: req.user!.organizationId,
+      }
+    });
+    res.status(201).json(record);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Update maintenance status (from Frontend)
+router.patch('/:id/status', requireManager, async (req, res, next) => {
+  try {
+    const { status, resolutionNotes } = req.body;
+    const record = await prisma.maintenanceRequest.update({
+      where: { id: req.params.id },
+      data: { status, resolutionNotes }
+    });
+    
+    // If completed, update asset status back to AVAILABLE
+    if (status === 'RESOLVED') {
+      await prisma.asset.update({
+        where: { id: record.assetId },
+        data: { status: 'AVAILABLE' }
+      });
+    } else if (status === 'IN_REPAIR') {
+      await prisma.asset.update({
+        where: { id: record.assetId },
+        data: { status: 'UNDER_MAINTENANCE' }
+      });
+    }
+
+    res.json(record);
   } catch (error) {
     next(error);
   }

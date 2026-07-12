@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { AssetService } from '../modules/assets/services/asset.service';
-import { requireManager } from '../middleware/auth';
+import { requireAuth, requireManager } from '../middleware/auth';
 import { prisma } from '../lib/db/prisma';
 import { AssetStatus } from '@prisma/client';
 
@@ -22,7 +22,7 @@ router.post('/', requireManager, async (req, res, next) => {
 });
 
 // Search and filter assets (All users, results scoped to org)
-router.get('/', async (req, res, next) => {
+router.get('/', requireAuth, async (req, res, next) => {
   try {
     const { tag, serialNumber, categoryId, status, departmentId, locationId, search } = req.query;
     const whereClause: any = {

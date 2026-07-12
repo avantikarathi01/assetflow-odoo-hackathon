@@ -1,11 +1,48 @@
 import { Router } from 'express';
 import { BookingService } from '../modules/bookings/services/booking.service';
+import { requireAuth } from '../middleware/auth';
+import { prisma } from '../lib/db/prisma';
 
 const router = Router();
 
-// Create booking hold (soft-hold)
-router.post('/', async (req, res, next) => {
+// Get all bookable resources
+router.get('/resources', requireAuth, async (req, res, next) => {
   try {
+    const orgId = req.user!.organizationId;
+    const resources = await prisma.resource.findMany({
+      where: { organizationId: orgId },
+      include: {
+        location: true
+      }
+    });
+    res.json(resources);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get all bookings
+router.get('/', requireAuth, async (req, res, next) => {
+  try {
+    const orgId = req.user!.organizationId;
+    const bookings = await prisma.resourceBooking.findMany({
+      where: { resource: { organizationId: orgId } },
+      include: {
+        resource: true,
+        bookedBy: true
+      },
+      orderBy: { startAt: 'desc' }
+    });
+    res.json(bookings);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Create booking hold (soft-hold)
+router.post('/', requireAuth, async (req, res, next) => {
+  try {
+    // using BookingService from HEAD
     const booking = await BookingService.createBooking(
       req.user!.organizationId,
       req.user!.userId,
@@ -18,7 +55,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // Confirm booking hold
-router.post('/:bookingId/confirm', async (req, res, next) => {
+router.post('/:bookingId/confirm', requireAuth, async (req, res, next) => {
   try {
     const { bookingId } = req.params;
     const booking = await BookingService.confirmBooking(
@@ -33,7 +70,7 @@ router.post('/:bookingId/confirm', async (req, res, next) => {
 });
 
 // Cancel booking
-router.post('/:bookingId/cancel', async (req, res, next) => {
+router.post('/:bookingId/cancel', requireAuth, async (req, res, next) => {
   try {
     const { bookingId } = req.params;
     const { reason } = req.body;
@@ -50,7 +87,7 @@ router.post('/:bookingId/cancel', async (req, res, next) => {
 });
 
 // Check-in to booking
-router.post('/:bookingId/checkin', async (req, res, next) => {
+router.post('/:bookingId/checkin', requireAuth, async (req, res, next) => {
   try {
     const { bookingId } = req.params;
     const booking = await BookingService.checkIn(
@@ -64,7 +101,7 @@ router.post('/:bookingId/checkin', async (req, res, next) => {
 });
 
 // Complete booking
-router.post('/:bookingId/complete', async (req, res, next) => {
+router.post('/:bookingId/complete', requireAuth, async (req, res, next) => {
   try {
     const { bookingId } = req.params;
     const booking = await BookingService.completeBooking(
@@ -72,6 +109,20 @@ router.post('/:bookingId/complete', async (req, res, next) => {
       bookingId,
       req.user!.userId
     );
+    res.json(booking);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Confirm/Update status (from Frontend)
+router.patch('/:id/status', requireAuth, async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const booking = await prisma.resourceBooking.update({
+      where: { id: req.params.id },
+      data: { status }
+    });
     res.json(booking);
   } catch (error) {
     next(error);
