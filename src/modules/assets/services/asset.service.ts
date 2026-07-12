@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db/prisma';
-import { ConflictError, NotFoundError, ValidationError } from '../core/errors';
+import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 import { AssetStatus, AssetCondition, AssetCriticality, DepreciationMethod } from '@prisma/client';
 
 export class AssetService {
