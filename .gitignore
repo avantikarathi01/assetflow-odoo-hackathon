@@ -3,3 +3,9 @@ node_modules
 .env
 
 /generated/prisma
+
+# Build and local cache folders
+.next/
+dist/
+*.tsbuildinfo
+backend/scripts/create-category.js
