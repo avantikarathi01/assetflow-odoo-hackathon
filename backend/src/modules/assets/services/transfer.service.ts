@@ -55,7 +55,7 @@ export class TransferService {
         data: {
           organizationId,
           actorId: requestedById,
-          action: 'REQUESTED',
+          action: 'CREATED',
           entityType: 'TransferRequest',
           entityId: transfer.id,
           reason: data.reason
