@@ -23,12 +23,13 @@
   <summary>Table of Contents</summary>
   <ol>
     <li><a href="#about-the-project">About The Project</a></li>
+    <li><a href="#unique-selling-propositions-usps">Unique Selling Propositions (USPs)</a></li>
     <li><a href="#key-features--functionalities">Key Features & Functionalities</a></li>
-    <li><a href="#tech-stack">Tech Stack</a></li>
-    <li><a href="#system-architecture">System Architecture</a></li>
-    <li><a href="#folder-structure">Folder Structure</a></li>
-    <li><a href="#database-design--schema">Database Design & Schema</a></li>
+    <li><a href="#system-design--architecture">System Design & Architecture</a></li>
+    <li><a href="#database-design--er-diagram">Database Design & ER Diagram</a></li>
     <li><a href="#backend-api-overview">Backend API Overview</a></li>
+    <li><a href="#tech-stack">Tech Stack</a></li>
+    <li><a href="#folder-structure">Folder Structure</a></li>
     <li><a href="#getting-started--local-setup">Getting Started & Local Setup</a></li>
     <li><a href="#testing--validation">Testing & Validation</a></li>
   </ol>
@@ -44,21 +45,34 @@ Organizations frequently struggle with fragmented operations: tracking who curre
 
 ---
 
+## 🌟 Unique Selling Propositions (USPs)
+
+What makes AssetFlow stand out from typical inventory trackers?
+
+1. **Atomic Concurrency Locks:** 
+   Prevent double-allocation of physical assets using a unique transactional database lock (`ActiveAssetAllocation`). If two managers attempt to assign the same laptop to different people at the exact same millisecond, the database structurally guarantees one will fail, preventing physical inventory discrepancies.
+2. **Soft-Hold Booking Engine:**
+   When a user selects a time-slot for a meeting room or company vehicle, the slot is placed in a `HELD` state for 10 minutes. If they do not complete the checkout flow, it expires automatically via a chron-job, freeing it up for others. Time-overlap is mathematically prevented using PostgreSQL Exclusion Constraints.
+3. **Immutable Event Sourcing:**
+   Every single action (Allocation, Transfer, Maintenance, Audit) generates a permanent, tamper-proof record in the `ActivityLog` and `AssetHistory`. This provides a pristine chain of custody required for enterprise compliance and auditing.
+4. **Idempotent API Operations:**
+   Network failures won't duplicate operations. Critical endpoints use `Idempotency-Key` headers, ensuring that if a client retries a successful (but dropped) request, the server won't accidentally allocate an asset twice.
+
+---
+
 ## ✨ Key Features & Functionalities
 
 - **🏢 Organization & Access Management**
-  - **Multi-Tenant Architecture:** Fully scoped organizational data model. One database powers multiple isolated organizations.
+  - **Multi-Tenant Architecture:** One database powers multiple isolated organizations. Every database query is strictly scoped by `organizationId`.
   - **Granular RBAC:** Flexible roles (`ADMIN`, `MANAGER`, `EMPLOYEE`) driving custom portal views and API-level permission gates.
   - **Real-Time Dashboards:** Role-specific KPIs. Admins see global metrics; employees see personal assets and schedules.
 
 - **💻 Advanced Asset Operations**
   - **Lifecycle Tracking:** Track assets from registration to retirement. Manage categories, conditions, locations, and departments.
-  - **Atomic Concurrency Locks:** Prevent double-allocation of assets using transactional database locks.
-  - **Transfer Workflows:** Employees can request assets (even if currently allocated). Managers approve/reject requests, maintaining strict chain of custody.
+  - **Transfer Workflows:** Employees can request assets (even if currently allocated). Managers approve/reject requests, seamlessly updating the chain of custody.
 
 - **📅 Shared Resource Booking**
   - **Unified Booking Engine:** Manage non-asset shared resources (e.g., conference rooms, company vehicles).
-  - **Conflict Prevention:** Database-level overlap constraints definitively reject overlapping time windows.
 
 - **🛠 Maintenance & Auditing**
   - **Maintenance Ticketing:** Complete maintenance approval workflows (Pending -> Approved -> In-Repair -> Resolved).
@@ -67,6 +81,79 @@ Organizations frequently struggle with fragmented operations: tracking who curre
 - **🔔 Live Notifications & Activity Stream**
   - System-wide activity logs track every creation, update, and deletion.
   - Real-time in-app notification center alerts users to transfer approvals, rejected bookings, and overdue items.
+
+---
+
+## 🏛 System Design & Architecture
+
+AssetFlow employs a **strictly segregated full-stack monorepo architecture** to cleanly separate UI concerns from complex domain rules. 
+
+> **Data Flow:** `Client (Next.js)` -> `Frontend Proxy (Next API routes)` -> `Express Backend (Port 4000)` -> `Prisma ORM` -> `PostgreSQL`
+
+By using an **Express backend separate from Next.js Server Actions**, AssetFlow can scale its API independently, easily support future mobile applications, and run background worker jobs (like chron-based maintenance reminders) without tying up the web server.
+
+---
+
+## 🗄 Database Design & ER Diagram
+
+The database is built on **PostgreSQL** and managed via **Prisma**. It is highly relational and designed to enforce strict data integrity constraints.
+
+### Entity-Relationship Diagram
+
+```mermaid
+erDiagram
+    ORGANIZATION ||--o{ USER : "employs"
+    ORGANIZATION ||--o{ DEPARTMENT : "contains"
+    ORGANIZATION ||--o{ ASSET : "owns"
+    ORGANIZATION ||--o{ RESOURCE : "owns"
+    ORGANIZATION ||--o{ ACTIVITY_LOG : "records"
+    
+    USER ||--o{ ASSET_ALLOCATION : "receives"
+    USER ||--o{ TRANSFER_REQUEST : "requests"
+    USER ||--o{ MAINTENANCE_REQUEST : "reports"
+    USER ||--o{ RESOURCE_BOOKING : "books"
+
+    DEPARTMENT ||--o{ ASSET : "manages"
+    
+    ASSET ||--o{ ASSET_ALLOCATION : "has"
+    ASSET ||--o{ TRANSFER_REQUEST : "has"
+    ASSET ||--o{ MAINTENANCE_REQUEST : "undergoes"
+    ASSET ||--o{ AUDIT_RECORD : "verified_in"
+    ASSET ||--o{ ASSET_HISTORY : "tracks"
+
+    ASSET_ALLOCATION ||--o| ACTIVE_LOCK : "protected_by"
+
+    RESOURCE ||--o{ RESOURCE_BOOKING : "has"
+    
+    AUDIT_CYCLE ||--o{ AUDIT_RECORD : "contains"
+```
+
+### Core Schema Details
+1. **Organization:** The root tenant (`id`, `slug`). All other records reference an `organizationId` with `Restrict` or `Cascade` deletion rules.
+2. **User, Role, & Department:** Represents the human hierarchy. A user has a `UserRole` and a primary `Department`.
+3. **Asset & AssetCategory:** Represents physical trackable items. Assets can be assigned to `Locations` and `Departments`. Includes financial details like `purchaseCost` and `depreciationMethod`.
+4. **AssetAllocation & ActiveAssetAllocation:** `AssetAllocation` is a historical ledger of who held what. `ActiveAssetAllocation` is a 1-to-1 table connected to `Asset` that acts as a unique constraint to prevent double-booking.
+5. **TransferRequest:** Manages the workflow (`REQUESTED`, `APPROVED`, `REJECTED`) of moving an asset.
+6. **Resource & ResourceBooking:** Separated from Assets. Bookings use start/end times and prevent overlap.
+7. **MaintenanceRequest:** Tickets raised against Assets for repair (`PENDING`, `IN_REPAIR`, `RESOLVED`).
+8. **AuditCycle & AuditRecord:** Batched inventory verification. Cycles span specific date ranges and include multiple asset checks.
+
+---
+
+## 🔌 Backend API Overview
+
+The backend exposes a comprehensive RESTful API. All routes are prefixed with `/api` and require a valid JWT Bearer token (except auth routes).
+
+| Domain | Routes | Purpose |
+| :--- | :--- | :--- |
+| **Auth** | `POST /auth/login`, `POST /auth/register` | Authentication, JWT issuance |
+| **Dashboard** | `GET /dashboard` | Fetches KPIs, upcoming events, and Activity Stream |
+| **Assets** | `GET /assets`, `POST /assets`, `GET /assets/:id` | Asset CRUD, filtering, searching |
+| **Allocations** | `POST /allocations`, `POST /allocations/:id/return` | Assigning assets to users & returning them |
+| **Transfers** | `GET /transfers`, `POST /transfers`, `POST /transfers/:id/approve` | Requesting assets and manager approval workflows |
+| **Bookings** | `GET /bookings`, `POST /bookings` | Reserving shared resources |
+| **Maintenance** | `GET /maintenance`, `POST /maintenance` | Raising and managing repair tickets |
+| **Activity** | `GET /activity-logs`, `GET /notifications` | Fetching system logs and user alerts |
 
 ---
 
@@ -80,16 +167,6 @@ Organizations frequently struggle with fragmented operations: tracking who curre
 | **Database & ORM** | [PostgreSQL](https://www.postgresql.org/) (Neon DB), [Prisma ORM](https://www.prisma.io/) |
 | **Security & Auth** | `bcryptjs` (password hashing), `jsonwebtoken` (stateless JWT authentication) |
 | **Architecture** | NPM Workspaces (Monorepo) |
-
----
-
-## 🏛 System Architecture
-
-AssetFlow employs a **strictly segregated full-stack monorepo architecture** to cleanly separate UI concerns from complex domain rules. 
-
-> **Data Flow:** `Client (Next.js)` -> `Frontend Proxy (Next API routes)` -> `Express Backend (Port 4000)` -> `Prisma ORM` -> `PostgreSQL`
-
-By using an Express backend separate from Next.js Server Actions, AssetFlow can scale its API independently, easily support future mobile applications, and run background worker jobs (like chron-based maintenance reminders) without tying up the web server.
 
 ---
 
@@ -117,40 +194,6 @@ assetflow-odoo-hackathon/
 │   │   └── lib/              # Client API fetchers, Auth Context, Utils
 │   └── next.config.ts        # Automated /api reverse proxy to Backend
 ```
-
----
-
-## 🗄 Database Design & Schema
-
-The database is built on **PostgreSQL** and managed via **Prisma**. It is highly relational and designed to enforce data integrity.
-
-### Core Entities
-1. **Organization:** The root tenant. All records belong to an Organization.
-2. **User & Role:** Users belong to an organization and have assigned Roles (`UserRole`) dictating their permissions.
-3. **Asset & AssetCategory:** Represents physical trackable items. Assets can be assigned to `Locations` and `Departments`.
-4. **AssetAllocation & ActiveAssetAllocation:** Tracks who currently possesses an asset. `ActiveAssetAllocation` acts as a unique constraint to prevent double-booking.
-5. **TransferRequest:** Manages the workflow of moving an asset from one user/department to another.
-6. **Resource & ResourceBooking:** Represents bookable entities (rooms, vehicles) and their time-based reservations.
-7. **MaintenanceRequest:** Tickets raised against Assets for repair.
-8. **AuditCycle & AuditRecord:** Batched inventory verification records.
-9. **ActivityLog & Notification:** Immutable event sourcing for the dashboard activity stream and user-specific alerts.
-
----
-
-## 🔌 Backend API Overview
-
-The backend exposes a comprehensive RESTful API. All routes are prefixed with `/api` and (mostly) require a valid JWT Bearer token.
-
-| Domain | Routes | Purpose |
-| :--- | :--- | :--- |
-| **Auth** | `POST /auth/login`, `POST /auth/register` | Authentication, JWT issuance |
-| **Dashboard** | `GET /dashboard` | Fetches KPIs, upcoming events, and Activity Stream |
-| **Assets** | `GET /assets`, `POST /assets`, `GET /assets/:id` | Asset CRUD, filtering, searching |
-| **Allocations** | `POST /allocations`, `POST /allocations/:id/return` | Assigning assets to users & returning them |
-| **Transfers** | `GET /transfers`, `POST /transfers`, `POST /transfers/:id/approve` | Requesting assets and manager approval workflows |
-| **Bookings** | `GET /bookings`, `POST /bookings` | Reserving shared resources |
-| **Maintenance** | `GET /maintenance`, `POST /maintenance` | Raising and managing repair tickets |
-| **Activity** | `GET /activity-logs`, `GET /notifications` | Fetching system logs and user alerts |
 
 ---
 
