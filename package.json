@@ -1,35 +1,13 @@
 {
+  "name": "assetflow-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "@hookform/resolvers": "^5.4.0",
-    "@prisma/client": "^6.19.3",
-    "@types/node": "^26.1.1",
-    "@types/react": "^19.2.17",
-    "bcryptjs": "^3.0.3",
-    "class-variance-authority": "^0.7.1",
-    "cloudinary": "^2.10.0",
-    "clsx": "^2.1.1",
-    "jose": "^6.2.3",
-    "jsonwebtoken": "^9.0.3",
-    "lucide-react": "^1.24.0",
-    "next": "^16.2.10",
-    "prisma": "^6.19.3",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-hook-form": "^7.81.0",
-    "recharts": "^3.9.2",
-    "sonner": "^2.0.7",
-    "tailwind-merge": "^3.6.0",
-    "zod": "^4.4.3"
-  },
-  "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/jsonwebtoken": "^9.0.10",
-    "ts-node": "^10.9.2",
-    "typescript": "7.0.2"
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend"
   }
 }

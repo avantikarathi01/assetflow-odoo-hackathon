@@ -9,7 +9,7 @@ You can use the following `curl` commands in your terminal to test the authentic
 ## 1. Register an Admin Account & Organization
 *This creates your Acme organization and logs you in.*
 ```bash
-curl -s -X POST http://localhost:3000/api/auth/register \
+curl -s -X POST http://localhost:4000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"admin2@acme.com","password":"password123","firstName":"Admin","lastName":"User","organizationName":"Acme Corporation"}'
 ```
@@ -22,7 +22,7 @@ curl -s -X POST http://localhost:3000/api/auth/register \
 ```bash
 export TOKEN="paste_your_token_here"
 
-curl -s -X POST http://localhost:3000/api/organizations/locations \
+curl -s -X POST http://localhost:4000/api/organizations/locations \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"Headquarters","address":"123 Main St","type":"OFFICE"}'
@@ -35,7 +35,7 @@ curl -s -X POST http://localhost:3000/api/organizations/locations \
 ```bash
 export LOCATION_ID="paste_location_id_here"
 
-curl -s -X POST http://localhost:3000/api/organizations/departments \
+curl -s -X POST http://localhost:4000/api/organizations/departments \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"Engineering","code":"ENG","locationId":"'$LOCATION_ID'"}'
@@ -48,7 +48,7 @@ curl -s -X POST http://localhost:3000/api/organizations/departments \
 ```bash
 export DEPT_ID="paste_dept_id_here"
 
-curl -s -X POST http://localhost:3000/api/assets \
+curl -s -X POST http://localhost:4000/api/assets \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"MacBook Pro M3","categoryId":"it-equipment","departmentId":"'$DEPT_ID'"}'
@@ -59,7 +59,7 @@ curl -s -X POST http://localhost:3000/api/assets \
 ## 5. Check Dashboard KPIs
 *This fetches real-time aggregations from the backend.*
 ```bash
-curl -s -X GET http://localhost:3000/api/dashboard \
+curl -s -X GET http://localhost:4000/api/dashboard \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -68,7 +68,7 @@ curl -s -X GET http://localhost:3000/api/dashboard \
 ## 6. Register a Standard Employee (Test RBAC)
 *We will register a new user in the same org, who defaults to an `EMPLOYEE` role.*
 ```bash
-curl -s -X POST http://localhost:3000/api/auth/register \
+curl -s -X POST http://localhost:4000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"employee2@acme.com","password":"password123","firstName":"Bob","lastName":"Smith","organizationName":"Acme Corporation"}'
 ```
@@ -79,7 +79,7 @@ curl -s -X POST http://localhost:3000/api/auth/register \
 ```bash
 export EMP_TOKEN="paste_employee_token_here"
 
-curl -s -X POST http://localhost:3000/api/organizations/departments \
+curl -s -X POST http://localhost:4000/api/organizations/departments \
   -H "Authorization: Bearer $EMP_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"Rogue Department","code":"ROG","locationId":"'$LOCATION_ID'"}'
