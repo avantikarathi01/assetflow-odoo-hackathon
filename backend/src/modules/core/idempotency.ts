@@ -1,50 +1,54 @@
+import { Request, Response, NextFunction } from 'express';
 import { prisma } from '@/lib/db/prisma';
-import { NextRequest, NextResponse } from 'next/server';
 import { IdempotencyStatus } from '@prisma/client';
 import crypto from 'crypto';
-import { errorResponse } from './api-response';
 
-export async function withIdempotency(req: NextRequest, organizationId: string, userId: string | null, handler: () => Promise<NextResponse>) {
-  const idempotencyKey = req.headers.get('Idempotency-Key');
-  if (!idempotencyKey) {
-    // If no key is provided, bypass idempotency (or you could throw an error if strictly required)
-    return handler();
+export async function idempotencyMiddleware(req: Request, res: Response, next: NextFunction) {
+  if (req.method !== 'POST' && req.method !== 'PATCH') {
+    return next();
   }
 
-  const route = new URL(req.url).pathname;
+  const idempotencyKey = req.headers['idempotency-key'] as string;
+  if (!idempotencyKey) {
+    return next();
+  }
+
+  const organizationId = req.user?.organizationId;
+  const userId = req.user?.userId || null;
+  if (!organizationId) {
+    return next();
+  }
+
+  const route = req.path;
   
-  // Try to find an existing key
   const existingKey = await prisma.idempotencyKey.findUnique({
     where: { organizationId_key: { organizationId, key: idempotencyKey } }
   });
 
   if (existingKey) {
     if (existingKey.status === IdempotencyStatus.COMPLETED && existingKey.responseCode && existingKey.responseBody) {
-      return NextResponse.json(existingKey.responseBody, { status: existingKey.responseCode });
+      return res.status(existingKey.responseCode).json(existingKey.responseBody);
     }
     
     if (existingKey.status === IdempotencyStatus.PROCESSING) {
-      // Check if lockedUntil has passed (timeout recovery)
       if (existingKey.lockedUntil && new Date() > existingKey.lockedUntil) {
-        // Proceed to re-execute, we'll overwrite it
+        // Timeout recovery
       } else {
-        return NextResponse.json({ success: false, error: { code: 'CONFLICT', message: 'Request is already processing' } }, { status: 409 });
+        return res.status(409).json({ success: false, error: { code: 'CONFLICT', message: 'Request is already processing' } });
       }
     }
   }
 
-  // Calculate body hash (Optional: to ensure same payload)
   let requestHash = '';
   try {
-    const clonedReq = req.clone();
-    const text = await clonedReq.text();
-    requestHash = crypto.createHash('sha256').update(text).digest('hex');
+    if (req.body) {
+      requestHash = crypto.createHash('sha256').update(JSON.stringify(req.body)).digest('hex');
+    }
   } catch (e) {
-    // Ignore body hash if request has no body
+    // Ignore body hash
   }
 
-  // Create or update the processing lock
-  const lockedUntil = new Date(Date.now() + 5 * 60000); // 5 minute lock
+  const lockedUntil = new Date(Date.now() + 5 * 60000);
   
   await prisma.idempotencyKey.upsert({
     where: { organizationId_key: { organizationId, key: idempotencyKey } },
@@ -60,38 +64,24 @@ export async function withIdempotency(req: NextRequest, organizationId: string, 
     }
   });
 
-  try {
-    // Execute actual domain logic
-    const response = await handler();
+  const originalJson = res.json.bind(res);
+  
+  res.json = (body: any) => {
+    const statusCode = res.statusCode;
+    const isError = statusCode >= 400;
     
-    // Save successful response
-    const responseBody = await response.clone().json();
-    await prisma.idempotencyKey.update({
+    prisma.idempotencyKey.update({
       where: { organizationId_key: { organizationId, key: idempotencyKey } },
       data: {
-        status: IdempotencyStatus.COMPLETED,
-        responseCode: response.status,
-        responseBody,
+        status: isError ? IdempotencyStatus.FAILED : IdempotencyStatus.COMPLETED,
+        responseCode: statusCode,
+        responseBody: body as any,
         lockedUntil: null
       }
-    });
+    }).catch(console.error);
 
-    return response;
-  } catch (err: any) {
-    // Save failed response
-    const errRes = errorResponse(err);
-    const errBody = await errRes.clone().json();
-    
-    await prisma.idempotencyKey.update({
-      where: { organizationId_key: { organizationId, key: idempotencyKey } },
-      data: {
-        status: IdempotencyStatus.FAILED,
-        responseCode: errRes.status,
-        responseBody: errBody,
-        lockedUntil: null
-      }
-    });
+    return originalJson(body);
+  };
 
-    return errRes;
-  }
+  next();
 }

@@ -10,8 +10,8 @@ router.post('/', requireAdmin, async (req, res, next) => {
     const data = req.body;
     const location = await LocationService.createLocation(req.user!.organizationId, {
       name: data.name,
-      type: data.type || 'OFFICE',
-      address: data.address
+      code: data.code || data.name.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 4),
+      parentId: data.parentId
     });
     res.status(201).json(location);
   } catch (error: any) {

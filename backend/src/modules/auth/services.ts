@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db/prisma';
 import { RegisterDTO, LoginDTO } from './schemas';
-import { ConflictError, UnauthorizedError } from '../core/errors';
+import { ConflictError, NotFoundError, UnauthorizedError } from '../core/errors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -70,7 +70,7 @@ export class AuthService {
       });
 
       return { organization: org, user: { id: user.id, email: user.email } };
-    });
+    }, { timeout: 25000 });
   }
 
   static async login(data: LoginDTO) {
@@ -130,5 +130,43 @@ export class AuthService {
     });
 
     return { token, user: { id: user.id, email: user.email, roles: user.userRoles.map(ur => ur.role.name) } };
+  }
+
+  static async promoteEmployee(organizationId: string, targetUserId: string, roleName: string) {
+    const user = await prisma.user.findFirst({
+      where: { id: targetUserId, organizationId, deletedAt: null }
+    });
+    if (!user) throw new NotFoundError('User not found');
+
+    let role = await prisma.role.findFirst({
+      where: { name: roleName, organizationId }
+    });
+
+    if (!role) {
+      role = await prisma.role.create({
+        data: {
+          organizationId,
+          name: roleName,
+          description: `${roleName} role`
+        }
+      });
+    }
+
+    // Upsert UserRole mapping
+    await prisma.userRole.upsert({
+      where: {
+        userId_roleId: {
+          userId: targetUserId,
+          roleId: role.id
+        }
+      },
+      create: {
+        userId: targetUserId,
+        roleId: role.id
+      },
+      update: {}
+    });
+
+    return { success: true };
   }
 }

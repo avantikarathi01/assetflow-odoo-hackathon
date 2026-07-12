@@ -15,7 +15,10 @@ export class AvailabilityService {
     if (!asset) return false;
     
     // 1. Check physical intrinsic state
-    if (asset.status !== AssetStatus.AVAILABLE) return false;
+    const isAllowedStatus = excludeType === 'booking'
+      ? (asset.status === AssetStatus.AVAILABLE || asset.status === AssetStatus.RESERVED)
+      : asset.status === AssetStatus.AVAILABLE;
+    if (!isAllowedStatus) return false;
 
     // 2. Check Allocations
     if (excludeType !== 'allocation' && asset.activeAllocation) {
@@ -38,14 +41,18 @@ export class AvailabilityService {
         });
 
         const isCurrentlyBooked = activeBookings.some(b => {
-          const paddedStart = new Date(b.startAt.getTime() - resource.bufferBeforeMinutes * 60000);
-          const paddedEnd = new Date(b.endAt.getTime() + resource.bufferAfterMinutes * 60000);
-          
           // Ignore EXPIRED holds
           if (b.status === BookingStatus.HELD && b.holdExpiresAt && b.holdExpiresAt < now) {
             return false;
           }
 
+          // If we are checking for allocation, any active or future booking conflicts with allocation
+          if (excludeType === 'allocation') {
+            return b.endAt > now;
+          }
+
+          const paddedStart = new Date(b.startAt.getTime() - resource.bufferBeforeMinutes * 60000);
+          const paddedEnd = new Date(b.endAt.getTime() + resource.bufferAfterMinutes * 60000);
           return now >= paddedStart && now <= paddedEnd;
         });
 

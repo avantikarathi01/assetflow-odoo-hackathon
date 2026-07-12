@@ -150,4 +150,75 @@ export class AssetService {
       });
     });
   }
+
+  static async transitionAssetStatus(
+    tx: any,
+    organizationId: string,
+    assetId: string,
+    toState: AssetStatus,
+    actorId: string,
+    reason?: string,
+    metadata?: any
+  ) {
+    const asset = await tx.asset.findUnique({
+      where: { id: assetId }
+    });
+    if (!asset) throw new NotFoundError('Asset not found');
+
+    const fromState = asset.status;
+    if (fromState === toState) return asset;
+
+    const allowed = VALID_TRANSITIONS[fromState] || [];
+    if (!allowed.includes(toState)) {
+      throw new ValidationError(`Invalid asset status transition from ${fromState} to ${toState}`);
+    }
+
+    const updatedAsset = await tx.asset.update({
+      where: { id: assetId },
+      data: {
+        status: toState,
+        version: { increment: 1 }
+      }
+    });
+
+    await tx.activityLog.create({
+      data: {
+        organizationId,
+        actorId,
+        action: 'STATUS_CHANGED',
+        entityType: 'Asset',
+        entityId: assetId,
+        previousState: { status: fromState } as any,
+        newState: { status: toState } as any,
+        reason: reason || `Transitioned status from ${fromState} to ${toState}`,
+        metadata: metadata || null
+      }
+    });
+
+    await tx.assetHistory.create({
+      data: {
+        organizationId,
+        assetId,
+        actorId,
+        action: 'STATUS_CHANGED',
+        previousState: { status: fromState } as any,
+        newState: { status: toState } as any,
+        reason: reason || `Transitioned status from ${fromState} to ${toState}`,
+        metadata: metadata || null
+      }
+    });
+
+    return updatedAsset;
+  }
 }
+
+const VALID_TRANSITIONS: Record<AssetStatus, AssetStatus[]> = {
+  [AssetStatus.AVAILABLE]: [AssetStatus.RESERVED, AssetStatus.ALLOCATED, AssetStatus.UNDER_MAINTENANCE, AssetStatus.LOST, AssetStatus.RETIRED, AssetStatus.DISPOSED],
+  [AssetStatus.RESERVED]: [AssetStatus.AVAILABLE, AssetStatus.ALLOCATED, AssetStatus.LOST, AssetStatus.RETIRED],
+  [AssetStatus.ALLOCATED]: [AssetStatus.AVAILABLE, AssetStatus.UNDER_MAINTENANCE, AssetStatus.LOST, AssetStatus.RETURNED],
+  [AssetStatus.RETURNED]: [AssetStatus.AVAILABLE, AssetStatus.ALLOCATED, AssetStatus.UNDER_MAINTENANCE, AssetStatus.LOST],
+  [AssetStatus.UNDER_MAINTENANCE]: [AssetStatus.AVAILABLE, AssetStatus.RETIRED, AssetStatus.DISPOSED, AssetStatus.LOST],
+  [AssetStatus.LOST]: [AssetStatus.AVAILABLE, AssetStatus.RETIRED, AssetStatus.DISPOSED],
+  [AssetStatus.RETIRED]: [AssetStatus.AVAILABLE, AssetStatus.DISPOSED],
+  [AssetStatus.DISPOSED]: []
+};

@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/db/prisma';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
-import { AuditCycleStatus, AuditRecordStatus, AssetStatus } from '@prisma/client';
+import { AuditCycleStatus, AuditRecordStatus, AssetStatus, MaintenancePriority } from '@prisma/client';
+import { AssetService } from '../../assets/services/asset.service';
+import { NotificationService } from '../../notifications/notification.service';
 
 export class AuditService {
   /**
@@ -55,7 +57,7 @@ export class AuditService {
       });
 
       return cycle;
-    });
+    }, { timeout: 25000 });
   }
 
   /**
@@ -96,18 +98,23 @@ export class AuditService {
   /**
    * Closes the cycle and structurally enforces the consequences (e.g. marking missing assets as LOST).
    */
-  static async closeCycle(organizationId: string, cycleId: string, closedById: string) {
+  static async closeCycle(organizationId: string, cycleId: string, closedById: string, forceClose = false) {
     const cycle = await prisma.auditCycle.findFirst({
       where: { id: cycleId, organizationId },
-      include: { records: true }
+      include: {
+        records: {
+          include: { asset: true }
+        }
+      }
     });
 
     if (!cycle) throw new NotFoundError('Audit cycle not found');
     if (cycle.status === AuditCycleStatus.CLOSED) throw new ValidationError('Cycle is already closed');
 
     const pendingRecords = cycle.records.filter(r => r.status === AuditRecordStatus.PENDING);
-    if (pendingRecords.length > 0) {
-      throw new ValidationError(`Cannot close cycle. ${pendingRecords.length} assets are still pending verification.`);
+    if (pendingRecords.length > 0 && !forceClose) {
+      const pendingAssetTags = pendingRecords.map(r => r.asset.assetTag).join(', ');
+      throw new ValidationError(`Cannot close cycle. The following assets are still pending verification: ${pendingAssetTags}. Use forceClose=true to bypass.`);
     }
 
     return prisma.$transaction(async (tx) => {
@@ -117,25 +124,43 @@ export class AuditService {
         data: { status: AuditCycleStatus.CLOSED, closedAt: new Date(), version: { increment: 1 } }
       });
 
-      // 2. Identify missing assets and update their real status
-      const missingRecords = cycle.records.filter(r => r.status === AuditRecordStatus.MISSING);
-      
-      for (const record of missingRecords) {
-        await tx.asset.update({
-          where: { id: record.assetId },
-          data: { status: AssetStatus.LOST, version: { increment: 1 } }
-        });
-
-        await tx.assetHistory.create({
-          data: {
+      // 2. Process records
+      for (const record of cycle.records) {
+        if (record.status === AuditRecordStatus.MISSING) {
+          await AssetService.transitionAssetStatus(
+            tx,
             organizationId,
-            assetId: record.assetId,
-            actorId: closedById,
-            action: 'STATUS_CHANGED',
-            reason: `Asset declared LOST during Audit Cycle closure (${cycleId})`,
-            newState: { status: AssetStatus.LOST }
+            record.assetId,
+            AssetStatus.LOST,
+            closedById,
+            `Asset declared LOST during Audit Cycle closure (${cycleId})`
+          );
+        } else if (record.status === AuditRecordStatus.DAMAGED) {
+          try {
+            await AssetService.transitionAssetStatus(
+              tx,
+              organizationId,
+              record.assetId,
+              AssetStatus.UNDER_MAINTENANCE,
+              closedById,
+              `Asset declared DAMAGED during Audit Cycle closure (${cycleId})`
+            );
+          } catch (e) {
+            // Ignore transitions that are disallowed due to other active allocations
           }
-        });
+
+          // Create maintenance request
+          await tx.maintenanceRequest.create({
+            data: {
+              organizationId,
+              assetId: record.assetId,
+              requestedById: closedById,
+              issue: `Auto-created from Audit Cycle closure (${cycleId}). Condition observed: DAMAGED. Remarks: ${record.remarks || 'None'}`,
+              priority: MaintenancePriority.HIGH,
+              status: 'PENDING',
+            }
+          });
+        }
       }
 
       await tx.activityLog.create({
@@ -145,11 +170,54 @@ export class AuditService {
           action: 'STATUS_CHANGED',
           entityType: 'AuditCycle',
           entityId: cycleId,
-          reason: `Audit cycle closed. ${missingRecords.length} assets marked as lost.`
+          reason: `Audit cycle closed. Force closed: ${forceClose}`
         }
       });
 
-      return { success: true, missingAssetsMarkedLost: missingRecords.length };
-    });
+      // 3. Generate discrepancy report
+      const discrepancies = cycle.records.filter(r => r.status !== AuditRecordStatus.VERIFIED);
+      
+      const report = [];
+      for (const disc of discrepancies) {
+        const logs = await tx.activityLog.findMany({
+          where: { organizationId, entityType: 'Asset', entityId: disc.assetId },
+          orderBy: { createdAt: 'desc' },
+          take: 3
+        });
+        report.push({
+          assetId: disc.assetId,
+          assetTag: disc.asset.assetTag,
+          assetName: disc.asset.name,
+          observedStatus: disc.status,
+          remarks: disc.remarks,
+          verifiedAt: disc.verifiedAt,
+          recentActivity: logs.map((l: any) => ({
+            action: l.action,
+            actorId: l.actorId,
+            reason: l.reason,
+            createdAt: l.createdAt
+          }))
+        });
+      }
+
+      if (discrepancies.length > 0) {
+        await NotificationService.create(
+          organizationId,
+          closedById,
+          'SYSTEM',
+          'WARNING',
+          'Audit Discrepancies Flagged',
+          `Audit cycle ${cycleId} has been closed with ${discrepancies.length} discrepancies (missing or damaged assets).`,
+          'AuditCycle',
+          cycleId
+        );
+      }
+
+      return {
+        success: true,
+        message: 'Audit Cycle closed successfully',
+        discrepancyReport: report
+      };
+    }, { timeout: 25000 });
   }
 }

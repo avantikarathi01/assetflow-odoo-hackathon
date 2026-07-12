@@ -2,6 +2,8 @@ import { prisma } from '@/lib/db/prisma';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 import { MaintenanceStatus, AssetStatus, MaintenancePriority } from '@prisma/client';
 import { AvailabilityService } from '../../core/availability.service';
+import { AssetService } from '../../assets/services/asset.service';
+import { NotificationService } from '../../notifications/notification.service';
 
 export class MaintenanceService {
   /**
@@ -38,7 +40,7 @@ export class MaintenanceService {
       });
 
       return request;
-    });
+    }, { timeout: 25000 });
   }
 
   /**
@@ -57,7 +59,6 @@ export class MaintenanceService {
     }
 
     return prisma.$transaction(async (tx) => {
-      // 1. Approve request
       const updatedRequest = await tx.maintenanceRequest.update({
         where: { id: requestId },
         data: {
@@ -70,26 +71,111 @@ export class MaintenanceService {
         }
       });
 
-      // 2. Change Asset state to UNDER_MAINTENANCE
-      await tx.asset.update({
-        where: { id: request.assetId },
-        data: { status: AssetStatus.UNDER_MAINTENANCE, version: { increment: 1 } }
+      await AssetService.transitionAssetStatus(
+        tx,
+        organizationId,
+        request.assetId,
+        AssetStatus.UNDER_MAINTENANCE,
+        approvedById,
+        `Asset moved to maintenance for request ${requestId}`
+      );
+
+      await NotificationService.create(
+        organizationId,
+        request.requestedById,
+        'MAINTENANCE',
+        'SUCCESS',
+        'Maintenance Request Approved',
+        `Your maintenance request for asset ${request.assetId} has been approved.`,
+        'MaintenanceRequest',
+        requestId
+      );
+
+      return updatedRequest;
+    }, { timeout: 25000 });
+  }
+
+  /**
+   * Rejects a maintenance request.
+   */
+  static async rejectRequest(organizationId: string, requestId: string, actorId: string, data: { reason: string }) {
+    const request = await prisma.maintenanceRequest.findFirst({
+      where: { id: requestId, organizationId, status: MaintenanceStatus.PENDING }
+    });
+
+    if (!request) throw new NotFoundError('Pending maintenance request not found');
+
+    return prisma.$transaction(async (tx) => {
+      const updatedRequest = await tx.maintenanceRequest.update({
+        where: { id: requestId },
+        data: {
+          status: MaintenanceStatus.REJECTED,
+          rejectedAt: new Date(),
+          resolutionNotes: data.reason,
+          version: { increment: 1 }
+        }
       });
 
-      // 3. Log History
-      await tx.assetHistory.create({
+      await tx.activityLog.create({
         data: {
           organizationId,
-          assetId: request.assetId,
-          actorId: approvedById,
-          action: 'STATUS_CHANGED',
-          reason: `Asset moved to maintenance for request ${requestId}`,
-          newState: { status: AssetStatus.UNDER_MAINTENANCE }
+          actorId,
+          action: 'REJECTED',
+          entityType: 'MaintenanceRequest',
+          entityId: requestId,
+          reason: `Maintenance request rejected: ${data.reason}`
+        }
+      });
+
+      await NotificationService.create(
+        organizationId,
+        request.requestedById,
+        'MAINTENANCE',
+        'WARNING',
+        'Maintenance Request Rejected',
+        `Your maintenance request for asset ${request.assetId} was rejected. Reason: ${data.reason}`,
+        'MaintenanceRequest',
+        requestId
+      );
+
+      return updatedRequest;
+    }, { timeout: 25000 });
+  }
+
+  /**
+   * Assigns a technician to the maintenance request.
+   */
+  static async assignTechnician(organizationId: string, requestId: string, technicianId: string, actorId: string) {
+    const request = await prisma.maintenanceRequest.findFirst({
+      where: { id: requestId, organizationId }
+    });
+
+    if (!request) throw new NotFoundError('Maintenance request not found');
+
+    return prisma.$transaction(async (tx) => {
+      const updatedRequest = await tx.maintenanceRequest.update({
+        where: { id: requestId },
+        data: {
+          status: MaintenanceStatus.ASSIGNED,
+          assignedTechnicianId: technicianId,
+          assignedAt: new Date(),
+          version: { increment: 1 }
+        }
+      });
+
+      await tx.activityLog.create({
+        data: {
+          organizationId,
+          actorId,
+          action: 'UPDATED',
+          entityType: 'MaintenanceRequest',
+          entityId: requestId,
+          reason: `Assigned technician ${technicianId}`
         }
       });
 
       return updatedRequest;
-    });
+    }, { timeout: 25000 });
   }
 
   /**
@@ -107,7 +193,6 @@ export class MaintenanceService {
     }
 
     return prisma.$transaction(async (tx) => {
-      // 1. Resolve request
       const updatedRequest = await tx.maintenanceRequest.update({
         where: { id: requestId },
         data: {
@@ -120,26 +205,18 @@ export class MaintenanceService {
         }
       });
 
-      // 2. Return Asset to AVAILABLE (if it was under maintenance)
       if (request.asset.status === AssetStatus.UNDER_MAINTENANCE) {
-        await tx.asset.update({
-          where: { id: request.assetId },
-          data: { status: AssetStatus.AVAILABLE, version: { increment: 1 } }
-        });
-
-        await tx.assetHistory.create({
-          data: {
-            organizationId,
-            assetId: request.assetId,
-            actorId: resolvedById,
-            action: 'STATUS_CHANGED',
-            reason: `Maintenance completed for request ${requestId}`,
-            newState: { status: AssetStatus.AVAILABLE }
-          }
-        });
+        await AssetService.transitionAssetStatus(
+          tx,
+          organizationId,
+          request.assetId,
+          AssetStatus.AVAILABLE,
+          resolvedById,
+          `Maintenance completed for request ${requestId}`
+        );
       }
 
       return updatedRequest;
-    });
+    }, { timeout: 25000 });
   }
 }

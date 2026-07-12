@@ -1,7 +1,8 @@
 import { prisma } from '../../../lib/db/prisma';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
-import { AssetStatus, AllocationStatus, TransferStatus } from '@prisma/client';
+import { AssetStatus, AllocationStatus, TransferStatus, AssetCondition } from '@prisma/client';
 import { AvailabilityService } from '../../core/availability.service';
+import { AssetService } from './asset.service';
 
 export class AllocationService {
   /**
@@ -48,13 +49,17 @@ export class AllocationService {
         throw err;
       }
 
-      // Update asset status
-      await tx.asset.update({
-        where: { id: assetId },
-        data: { status: AssetStatus.ALLOCATED, version: { increment: 1 } }
-      });
+      // Update asset status using state machine
+      await AssetService.transitionAssetStatus(
+        tx,
+        organizationId,
+        assetId,
+        AssetStatus.ALLOCATED,
+        allocatedById,
+        `Asset allocated to user ${data.allocatedToUserId}`
+      );
 
-      // Logs
+      // Logs specific to the allocation entity
       await tx.activityLog.create({
         data: {
           organizationId,
@@ -62,29 +67,18 @@ export class AllocationService {
           action: 'ALLOCATED',
           entityType: 'AssetAllocation',
           entityId: allocation.id,
-          reason: `Asset allocated to user ${data.allocatedToUserId}`
-        }
-      });
-
-      await tx.assetHistory.create({
-        data: {
-          organizationId,
-          assetId,
-          actorId: allocatedById,
-          action: 'ALLOCATED',
-          metadata: { allocatedToUserId: data.allocatedToUserId, allocationId: allocation.id },
-          reason: 'Standard allocation'
+          reason: `Asset allocation created: ${allocation.id}`
         }
       });
 
       return allocation;
-    });
+    }, { timeout: 25000 });
   }
 
   /**
    * Returns an allocated asset to the available pool.
    */
-  static async returnAsset(organizationId: string, allocationId: string, returnedById: string, data: { returnNotes?: string, condition?: string }) {
+  static async returnAsset(organizationId: string, allocationId: string, returnedById: string, data: { returnNotes?: string, condition?: AssetCondition }) {
     const allocation = await prisma.assetAllocation.findFirst({
       where: { id: allocationId, organizationId, status: AllocationStatus.ACTIVE },
       include: { asset: true }
@@ -109,30 +103,25 @@ export class AllocationService {
         where: { allocationId }
       });
 
-      // 3. Update asset status and condition
-      const updateData: any = { status: AssetStatus.AVAILABLE, version: { increment: 1 } };
+      // 3. Update asset status and condition via state machine
+      await AssetService.transitionAssetStatus(
+        tx,
+        organizationId,
+        allocation.assetId,
+        AssetStatus.AVAILABLE,
+        returnedById,
+        data.returnNotes || 'Asset returned',
+        { conditionCheck: data.condition }
+      );
+
       if (data.condition) {
-        updateData.condition = data.condition;
+        await tx.asset.update({
+          where: { id: allocation.assetId },
+          data: { condition: data.condition }
+        });
       }
 
-      await tx.asset.update({
-        where: { id: allocation.assetId },
-        data: updateData
-      });
-
-      // 4. Logs
-      await tx.assetHistory.create({
-        data: {
-          organizationId,
-          assetId: allocation.assetId,
-          actorId: returnedById,
-          action: 'RETURNED',
-          reason: data.returnNotes || 'Asset returned',
-          metadata: { conditionCheck: data.condition }
-        }
-      });
-
       return { success: true, message: 'Asset successfully returned' };
-    });
+    }, { timeout: 25000 });
   }
 }

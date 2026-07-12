@@ -25,7 +25,6 @@ async function runE2E() {
     const orgSuffix = Date.now();
     const { user: admin, organization: org } = await AuthService.registerOrganization({
       organizationName: `Acme Corp ${orgSuffix}`,
-      slug: `acme-${orgSuffix}`,
       firstName: 'Alice',
       lastName: 'Admin',
       email: `alice+${orgSuffix}@example.com`,
@@ -197,10 +196,10 @@ async function runE2E() {
     const audit = await AuditService.createCycle(org.id, admin.id, {
       title: 'Q3 IT Audit',
       departmentId: itDept.id,
-      plannedStartAt: new Date(),
-      plannedEndAt: new Date(Date.now() + 86400000)
+      plannedStartAt: new Date().toISOString(),
+      plannedEndAt: new Date(Date.now() + 86400000).toISOString()
     });
-    console.log(`✅ Audit Cycle created with ${audit.records?.length || 0} expected records`);
+    console.log(`✅ Audit Cycle created`);
 
     const auditRecord = await prisma.auditRecord.findFirstOrThrow({
       where: { auditCycleId: audit.id, assetId: asset.id }

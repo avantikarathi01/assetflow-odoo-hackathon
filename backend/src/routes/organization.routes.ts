@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { LocationService } from '../modules/organizations/location.service';
+import { DepartmentService } from '../modules/organizations/department.service';
 import { requireAdmin } from '../middleware/auth';
 
 const router = Router();
@@ -9,8 +10,8 @@ router.post('/locations', requireAdmin, async (req, res, next) => {
     const data = req.body;
     const location = await LocationService.createLocation(req.user!.organizationId, {
       name: data.name,
-      type: data.type || 'OFFICE',
-      address: data.address
+      code: data.code || data.name.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 4),
+      parentId: data.parentId
     });
     res.status(201).json(location);
   } catch (error: any) {
@@ -21,11 +22,11 @@ router.post('/locations', requireAdmin, async (req, res, next) => {
 router.post('/departments', requireAdmin, async (req, res, next) => {
   try {
     const data = req.body;
-    const department = await LocationService.createDepartment(req.user!.organizationId, {
+    const department = await DepartmentService.createDepartment(req.user!.organizationId, {
       name: data.name,
       code: data.code,
-      locationId: data.locationId,
-      managerId: data.managerId
+      parentId: data.parentId,
+      headUserId: data.headUserId || data.managerId
     });
     res.status(201).json(department);
   } catch (error: any) {
