@@ -1,108 +1,135 @@
-# AssetFlow - Enterprise Asset & Resource Management System
+<div align="center">
+  <br />
+  <h1>🏢 AssetFlow</h1>
+  <p>
+    <strong>Enterprise Asset & Resource Management System</strong>
+  </p>
+  <p>
+    A workflow-first platform built for the Odoo Hackathon to seamlessly manage assets, shared resources, and complex operational lifecycles.
+  </p>
 
-AssetFlow is a workflow-first asset and shared resource management platform built for the Odoo Hackathon. It helps organizations manage departments, employees, physical assets, shared resources, allocations, transfers, maintenance approvals, audit cycles, notifications, and analytics from a single system instead of scattered spreadsheets and manual logs.
+  <div>
+    <img src="https://img.shields.io/badge/Next.js-black?style=for-the-badge&logo=next.js&logoColor=white" alt="Next JS" />
+    <img src="https://img.shields.io/badge/Express.js-%23404d59.svg?style=for-the-badge&logo=express&logoColor=%2361DAFB" alt="Express.js" />
+    <img src="https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white" alt="Prisma" />
+    <img src="https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white" alt="Postgres" />
+    <img src="https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  </div>
+</div>
 
-The project is designed as an **ERP-style system** rather than a plain CRUD app. The architecture introduces organization boundaries, role-based access control (RBAC), state-driven workflows, conflict prevention, audit history, booking hold logic, and reporting foundations so the system can scale beyond a hackathon demo into a production-style design.
+<br />
 
-## Problem It Solves
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li><a href="#about-the-project">About The Project</a></li>
+    <li><a href="#key-features">Key Features</a></li>
+    <li><a href="#system-architecture">System Architecture</a></li>
+    <li><a href="#tech-stack">Tech Stack</a></li>
+    <li><a href="#getting-started">Getting Started</a></li>
+    <li><a href="#testing--validation">Testing & Validation</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+  </ol>
+</details>
 
-Organizations often struggle to answer simple operational questions such as: *who currently holds an asset, which room is free, which resources are overdue, what is under maintenance, and which audit discrepancies still need action.* AssetFlow turns those fragmented operations into traceable workflows with strong validation and centralized visibility.
+<br />
 
-The system supports:
-- Department and employee master setup
-- Asset lifecycle tracking
-- Allocation and transfer workflows
-- Shared resource booking with overlap prevention
-- Temporary booking holds for better UX
-- Maintenance approval workflows
-- Structured audit cycles
-- Notifications, activity logs, and KPI dashboards
+## 📖 About The Project
 
-## 🏗 System Architecture (Monorepo)
+Organizations frequently struggle with fragmented operations: tracking who currently holds an asset, which meeting room is available, which equipment is overdue for maintenance, and which audit discrepancies require action. 
 
-AssetFlow leverages a **strictly segregated full-stack monorepo architecture** (NPM Workspaces) to cleanly separate UI concerns from complex domain rules.
+**AssetFlow** is engineered as a robust **ERP-style system** rather than a simple CRUD application. It turns fragmented workflows into strictly validated processes with centralized visibility. Designed for scale, it introduces multi-tenant organization boundaries, granular role-based access control (RBAC), conflict prevention, and immutable audit histories.
+
+---
+
+## ✨ Key Features
+
+- **🏢 Organization & Access Management**
+  - **Multi-Tenant Ready:** Fully scoped organizational data model.
+  - **Granular RBAC:** Flexible roles (`Role`, `UserRole`) enabling tailored permissions without hardcoded limits.
+  - **Enterprise Security:** JWT-based sessions, password hashing, and idempotency keys to ensure safe retries.
+
+- **💻 Advanced Asset Operations**
+  - Track asset lifecycles from registration (category, condition, location) to retirement.
+  - **Atomic Concurrency Locks:** Prevent double-allocation of assets using transactional database locks.
+  - Formal transfer workflows requiring approval, maintaining strict chain of custody.
+
+- **📅 Shared Resource Booking**
+  - Unified booking engine for non-asset shared resources (e.g., conference rooms).
+  - **Database-Level Overlap Prevention:** PostgreSQL exclusion constraints definitively reject overlapping time windows.
+  - **Soft-Hold State:** Enhances UX by temporarily reserving slots during checkout flows.
+
+- **🛠 Maintenance & Auditing**
+  - Complete maintenance approval workflows (pending → approved → in-repair → resolved).
+  - Structured audit cycles for scheduled inventory verification with immutable post-close histories.
+
+---
+
+## 🏛 System Architecture
+
+AssetFlow employs a **strictly segregated full-stack monorepo architecture** (NPM Workspaces) to cleanly separate UI concerns from complex domain rules.
 
 ```text
 .
-├── backend/                  # Express.js REST API + Prisma ORM
-│   ├── prisma/               # Schema and Migrations
-│   ├── scripts/              # E2E test scripts
+├── backend/                  # ⚙️ Express.js REST API + Prisma ORM
+│   ├── prisma/               # Schema and DB Migrations
+│   ├── scripts/              # E2E validation & RBAC testing
 │   └── src/                  
-│       ├── modules/          # Domain-Driven services (Auth, Assets, Audit, etc.)
+│       ├── modules/          # Domain-Driven services (Auth, Assets, Audit)
 │       ├── routes/           # Express API routers
-│       └── server.ts         # Express server entry point
+│       └── server.ts         # Application entry point
 │
-├── frontend/                 # Next.js 15 (App Router) + Tailwind CSS + shadcn/ui
+├── frontend/                 # 🖥 Next.js 15 (App Router) + Tailwind CSS + shadcn/ui
 │   ├── public/
 │   ├── src/
-│   └── next.config.ts        # API Proxy to backend
+│   └── next.config.ts        # Automated /api reverse proxy to Backend
 │
-└── package.json              # Monorepo root
+└── package.json              # Monorepo configuration
 ```
 
-### High-Level Flow
-```text
-Client (Next.js UI)  -->  Frontend Server (/api proxy)  -->  Express.js Backend (Port 4000)
-       ↓                                                             ↓
- User Actions            Validation + Auth + RBAC + Domain Logic + Atomic Locks
-                                                                     ↓
-                                                       PostgreSQL (Prisma ORM)
-```
+> **Data Flow:** `Client (Next.js)` → `Frontend Proxy (/api)` → `Express Backend (4000)` → `Prisma` → `PostgreSQL`
 
-## 🚀 Key Capabilities
-
-### Organization and Access
-- **Multi-Tenant Ready:** Organization-scoped data model.
-- **Robust RBAC:** Role-based access using `Role` and `UserRole` for granular permission control.
-- **Security:** JWT authentication, session handling, and idempotency support for safe enterprise workflows.
-
-### Asset Operations
-- Asset registration with category, department, location, lifecycle state, condition, and ownership context.
-- Historical allocation ledger plus an **active allocation lock model** to prevent double allocation under concurrency.
-- Transfer requests with explicit workflow states instead of ad hoc reassignment.
-
-### Resource Booking
-- Shared resource abstraction separated from assets so rooms and other bookable entities are modeled cleanly.
-- PostgreSQL **exclusion constraints** are used to prevent time-slot overlaps at the database level.
-- Temporary **soft-hold** support improves UX by reducing false availability during booking flows.
-
-### Maintenance and Audits
-- Maintenance requests move through explicit states (pending, approved, assigned, in repair, resolved).
-- Audit cycles support scoped verification, discrepancy tracking, and post-close immutability protections.
+---
 
 ## 🛠 Tech Stack
 
-| Layer | Technology |
-|---|---|
-| **Frontend UI** | Next.js 15 (App Router), Tailwind CSS, shadcn/ui |
-| **Backend API** | Express.js, Node.js |
-| **Language** | TypeScript (Strict Mode) |
-| **ORM & DB** | Prisma ORM & PostgreSQL |
-| **Security** | bcryptjs, jsonwebtoken |
-| **Package Manager**| NPM Workspaces |
+| Category | Technology |
+| :--- | :--- |
+| **Frontend** | [Next.js 15](https://nextjs.org/) (App Router), [Tailwind CSS](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/) |
+| **Backend** | [Express.js](https://expressjs.com/), [Node.js](https://nodejs.org/) |
+| **Language** | [TypeScript](https://www.typescriptlang.org/) (Strict Mode) |
+| **Database & ORM** | [PostgreSQL](https://www.postgresql.org/), [Prisma](https://www.prisma.io/) |
+| **Security & Auth** | `bcryptjs`, `jsonwebtoken` |
+| **Architecture** | NPM Workspaces (Monorepo) |
 
-## 💻 Getting Started
+---
+
+## 🚀 Getting Started
+
+Follow these steps to spin up the local development environment.
 
 ### Prerequisites
-- Node.js (v18+)
-- npm
-- PostgreSQL database running locally or remotely
+- [Node.js](https://nodejs.org/) (v18 or higher)
+- [npm](https://www.npmjs.com/)
+- A running instance of PostgreSQL.
 
 ### 1. Installation
-Clone the repository and install dependencies from the root directory. This will automatically install packages for both the `frontend` and `backend` workspaces.
+Clone the repository and install all workspace dependencies from the root directory:
 ```bash
+git clone https://github.com/avantikarathi01/assetflow-odoo-hackathon.git
+cd assetflow-odoo-hackathon
 npm install
 ```
 
 ### 2. Environment Variables
-Create a `.env` file inside the `/backend` directory:
+Create a `.env` file in the `/backend` directory:
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/assetflow?schema=public"
-JWT_SECRET="your_super_secret_jwt_key"
+JWT_SECRET="your_super_secret_jwt_key_here"
 ```
 
-### 3. Database Setup
-From the root directory, apply migrations and generate the Prisma client for the backend.
+### 3. Database Migration
+Apply the PostgreSQL schema and generate the Prisma client:
 ```bash
 cd backend
 npx prisma migrate dev
@@ -111,34 +138,42 @@ cd ..
 ```
 
 ### 4. Running the Application
-You can run the entire full-stack application simultaneously from the root directory:
+AssetFlow can be run simultaneously from the root directory:
 ```bash
-# Starts the Express API on http://localhost:4000
+# Terminal 1: Starts the Express API on http://localhost:4000
 npm run dev:backend
 
-# Starts the Next.js UI on http://localhost:3000
+# Terminal 2: Starts the Next.js UI on http://localhost:3000
 npm run dev:frontend
 ```
+*Requests made to `/api/*` on the frontend are automatically proxied to the backend.*
 
-*Note: The Next.js frontend is configured to automatically proxy any requests made to `/api/*` over to the Express backend at `http://localhost:4000/api/*`.*
+---
 
-### 5. Testing Concurrency & RBAC
-The backend comes with robust E2E validation scripts to test the integrity of atomic locks, roles, and complex cross-entity business rules.
+## 🧪 Testing & Validation
+
+The backend is strictly validated against race conditions and concurrent attacks. You can run our automated E2E and RBAC simulations to verify structural integrity:
+
 ```bash
 cd backend
+
+# Test core ERP workflows and Atomic Locks
 npx tsx scripts/test-e2e.ts
+
+# Test Organization Creation, Manager/Employee roles, and Permissions
 npx tsx scripts/test-roles.ts
 ```
 
+---
+
 ## 📈 Roadmap
 
-- **Frontend Dashboards:** Complete polished UI screens (KPIs, Asset Directory, Allocation Workflows).
-- **Interactive Bookings:** Rich availability calendar and booking hold countdown UX.
-- **Reporting:** Export workflows and advanced analytics.
-- **Media Management:** Production-ready Cloudinary integration for asset images and condition reports.
-
-## 🏆 Why AssetFlow Stands Out
-AssetFlow is not just an inventory tracker. It is an **ERP-style operations platform** that combines asset lifecycle management, shared resource scheduling, concurrency-safe transactions, approval workflows, auditability, and configurable business rules into one coherent, scalable system. 
+- [ ] **Frontend Dashboards:** Polish interactive KPI screens and Asset Directories.
+- [ ] **Interactive Bookings:** Build the rich availability calendar with real-time hold countdowns.
+- [ ] **Advanced Reporting:** Export workflows, SLA escalation tracking, and maintenance analytics.
+- [ ] **Media Management:** Integrate Cloudinary for condition-report images and avatar uploads.
 
 ---
-*Built for the Odoo Hackathon*
+<div align="center">
+  <i>Built with ❤️ for the Odoo Hackathon</i>
+</div> 
